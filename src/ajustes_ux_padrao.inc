@@ -1,3 +1,6 @@
+/* Numeric defaults captured from the owner TV on 2026-11-16.
+ * Existing installations and account preferences retain their normal precedence.
+ * Historical inline comments below describe the original factory values. */
   0, 0, 0,          /* qualidade, DV, Atmos */
   0,                /* idioma de legenda: 0 = seguir a conta */
   // AUDIO NO ORIGINAL POR PADRAO (LING_OPC_ORIGINAL, o indice do "~" em
@@ -13,16 +16,16 @@
   // SO VALE PARA INSTALACAO NOVA: quem ja tem ajustes.txt continua com o que
   // esta gravado la, porque o arquivo ganha do padrao — de proposito, senao
   // toda atualizacao desfaria escolha de usuario.
-  LING_OPC_ORIGINAL, /* idioma de audio: Original do titulo */
+  30, /* idioma de audio: Original do titulo */
   0,                /* painel ao pausar: ligado (o default do web) */
   1,                /* escolher a fonte ao reproduzir: DESLIGADO (V_LIGA: 1 = Desligado) */
-  0,                /* fonte automatica: melhor fonte (a regra de sempre) */
+  1,                /* fonte automatica: melhor fonte (a regra de sempre) */
   2,                /* outra fonte se falhar: ate 2 (eram 7 fixas ate a 1.4.3) */
-  0,                /* texto das fontes: do Nuvio */
+  1,                /* texto das fontes: do addon */
 
-  0,                /* posteres deitados: LIGADO (perfil do dono; fabrica: desligado) */
+  1,                /* posteres deitados: LIGADO (perfil do dono; fabrica: desligado) */
   0,                /* fundo em tela cheia: LIGADO (perfil; fabrica: desligado) */
-  0,                /* background do hero: seleção automática */
+  2,                /* background do hero: seleção automática */
   1,                /* destaque com outra arte: DESLIGADO (mesma foto do card, 19/09) */
   1,                /* trailer no destaque: DESLIGADO (V_LIGA: 1 = Desligado) */
 
@@ -44,43 +47,43 @@
   0,                /* mostrar destaque: ligado */
   0,                /* catalogos do destaque: leitura */
   0,                /* fundo da escolha de perfil: automatico (padrao de fabrica, #90) */
-  0,                /* local do descobrir: na busca */
+  1,                /* local do descobrir: na busca */
   // DESLIGADO por padrao: o cartaz ja traz o titulo impresso na arte, e repetir
   // o nome logo abaixo e a mesma informacao duas vezes ocupando altura de
   // fileira. Continua sendo ajuste — quem quiser o rotulo liga em Ajustes.
   1,                /* rotulos nos posteres: desligado */
-  0,                /* nome do addon: ligado */
-  0,                /* tipo de conteudo: ligado */
+  1,                /* nome do addon: ligado */
+  1,                /* tipo de conteudo: ligado */
   1,                /* ocultar nao lancados: desligado */
   0,                /* avaliacoes gerais: mostrar (SHOW_ALL) */
   1,                /* gradiente de foco classico: desligado */
 
   0,                /* continuar assistindo: ligado */
   0,                /* OK no card: retomar (cwOkLocal; 1 = abrir pagina) */
-  0,                /* fonte do continuar: ambas (o comportamento de sempre) */
+  1,                /* fonte do continuar: ambas (o comportamento de sempre) */
   0,                /* estilo: card */
   0,                /* miniatura do episodio: ligada */
   1,                /* desfocar proximo: desligado */
   0,                /* proximo do episodio mais alto: ligado */
-  0,                /* mostrar nao exibidos: ligado */
+  1,                /* mostrar nao exibidos: ligado */
   0,                /* ordenacao: padrao */
 
   1,                /* desfocar nao assistidos: desligado */
   0,                /* botao de trailer: ligado */
   0,                /* metadados externos: ligado */
-  0,                /* data completa: ligada */
+  1,                /* data completa: ligada */
   100,              /* escurecimento do fundo do titulo: vinheta inteira */
   0,                /* trailer automatico na pagina de titulo: ligado */
   0,                /* qualidade do trailer: maxima */
   0,                /* proporcao do trailer: zoom cinema */
   0,                /* fonte do trailer: automatico (Apple -> IMDb -> YouTube) */
 
-  0,                /* expandir poster ao focar: ligado (DEFAULT do web) */
-  3,                /* atraso: 3s */
+  1,                /* expandir poster ao focar: ligado (DEFAULT do web) */
+  2,                /* atraso: 3s */
   1,                /* navegacao horizontal rapida: desligada (fabrica) */
   0,                /* borda no cartaz em foco: ligada (o foco de sempre) */
 
-  0,                /* efeito de profundidade: ligado (2.0.5: e o reflexo do foco) */
+  1,                /* efeito de profundidade: ligado (2.0.5: e o reflexo do foco) */
   28,               /* brilho da borda (sem uso desde a 2.0.5; so a conta) */
   100,              /* reflexo: a intensidade do efeito */
   0,                /* cobertura da borda */
@@ -88,7 +91,7 @@
 
   126,              /* largura do item, dp (fabrica; o perfil do dono usa 120) */
   12,               /* arredondamento, dp */
-  1,                /* qualidade da imagem: Padrão (0 Baixa, 1 Padrão, 2 Alta) */
+  2,                /* qualidade da imagem: Padrão (0 Baixa, 1 Padrão, 2 Alta) */
 
   // Idioma 0 = Automatico: a conta (tmdb_language, depois o idioma de legenda),
   // depois o idioma da TV, depois English. O padrao NAO e o do dono do pacote:
@@ -96,8 +99,8 @@
   // ter escolhido e pior do que ler em ingles sem ter escolhido — por isso o
   // ultimo degrau e o ingles. Quem prefere outro troca em Ajustes -> Interface,
   // e a escolha fica gravada (e desliga o automatico).
-  0, 2, 0,          /* language, animations Automatic, resolution Automatic */
-  AJ_TEMA_DINAMICA, /* tema (cor de destaque): Da arte desde a 2.0 (dono, 05/10/2026: era Imersiva) */
+  0, 0, 1,          /* language, animations Automatic, resolution Automatic */
+  12, /* tema (cor de destaque): Da arte desde a 2.0 (dono, 05/10/2026: era Imersiva) */
   0,                /* cor da logo (so com tema dinamico): ligada */
   // O COMENTARIO ANTIGO AQUI ESTAVA ERRADO, e o erro so nao machucou por sorte.
   // Ele dizia `0, 0, /* versao, espaco */` logo depois do idioma, mas esta
@@ -135,12 +138,12 @@
   // conta continua mandando quando a chave chega no blob — este e so o ponto
   // de partida de quem nunca abriu o ajuste em lugar nenhum.
   0,                /* tmdb ligado */
-  0,                /* idioma: da interface */
-  0, 0, 0, 0, 0, 0, 0, /* arte, basico, ficha, datas, elenco, produtoras, redes */
+  1,                /* idioma: da interface */
+  0, 1, 0, 0, 1, 1, 1, /* arte, basico, ficha, datas, elenco, produtoras, redes */
   0, 0, 0, 0,       /* episodios, trailers, mais como este, colecoes */
   0,                /* enriquecer continuar assistindo */
   // MDBList: idem — a conta que traz a chave, e a consulta sempre correu.
-  0,                /* mdblist ligado */
+  1,                /* mdblist ligado */
   0,                /* chave: leitura */
   0, 0, 0, 0, 0, 0, 0, 0, /* trakt, imdb, tmdb, letterboxd, tomatoes,
                            audiencia, metacritic, mal */
@@ -148,18 +151,18 @@
   0,                /* diagnostico */
   0,                /* teste de velocidade: acao */
   0, 0, 0, 0,       /* explorar, guia, agenda, perfil na barra lateral: ligados */
-  0,                /* trailer do cartaz em foco: Desligado (AJ_TRAILER_CARTAZ_*; DEFAULT do web) */
+  1,                /* trailer do cartaz em foco: Desligado (AJ_TRAILER_CARTAZ_*; DEFAULT do web) */
   0,                /* itens por fileira: 12, como sempre foi (ver V_ITENS_FIL) */
-  TXT_FAMILIA_INTER,/* fonte da interface: independente da legenda */
-  0,                /* efeitos visuais do .tpk: automatico (adaptativo, ate o nivel 1) */
+  7,/* fonte da interface: independente da legenda */
+  2,                /* efeitos visuais do .tpk: automatico (adaptativo, ate o nivel 1) */
   2,                /* glass interface: Automatic */
   1,                /* servidor P2P: DESLIGADO (V_LIGA: 1 = Desligado) */
   0, 0,             /* endereco, testar: acoes */
-  0,                /* posteres personalizados: DESLIGADO (indice 0) */
+  3,                /* posteres personalizados: DESLIGADO (indice 0) */
   0, 0, 0, 0, 0, 0,/* endereco, token, parametros, chave, modelo, testar: acoes */
   0,                /* layout da home: Moderna (a de sempre) */
   0, 0, 0, 0, 0, 0, 0, 0, /* chaves e testes de debrid: acoes */
-  1,                /* usar sempre o Cinemeta: DESLIGADO (V_LIGA: 1 = Desligado) -> catalogo primeiro */
+  0,                /* usar sempre o Cinemeta: DESLIGADO (V_LIGA: 1 = Desligado) -> catalogo primeiro */
   // Notas na linha do titulo: de fabrica so o que a linha ja mostrava antes de
   // existir a escolha (IMDb, Rotten Tomatoes, Trakt). V_LIGA: 0 = Ligado.
   0, 0, 1, 1, 1,   /* imdb, tomates, popcornmeter, metacritic, metacritic usuarios */
@@ -173,7 +176,7 @@
   1,                /* addons do perfil principal: DESLIGADO (V_LIGA: 1); dono 09/10 */
   0,                /* transicao do destaque: Deslizar */
   // Arte do addon: todas DESLIGADAS (V_LIGA: 1 = Desligado) — o visual de antes.
-  1, 1, 1, 1,       /* posteres, fundo, logo do addon; arte das pastas da conta */
+  1, 0, 1, 1,       /* posteres, fundo, logo do addon; arte das pastas da conta */
   // LIGADO: e o que o oficial mostra com o pacote de selos da wiki importado,
   // e o pedido do #198. Quem prefere a fileira branca de antes desliga.
   1,                /* selos coloridos: DESLIGADO (V_LIGA: 1 = Desligado); Glass UI = todos brancos */
@@ -193,12 +196,12 @@
   0,                /* sincronia da miniatura: 0 s (a documentacao: nada automatico) */
   0,                /* ao sair do player: a home, minimizando na ilha (com o relogio) */
   0,                /* perguntar o que achou nos creditos: LIGADO (V_LIGA: 0 = Ligado) */
-  2,                /* espera pelos add-ons: 5 s (#221; indice 2 da lista do #202) */
+  3,                /* espera pelos add-ons: 5 s (#221; indice 2 da lista do #202) */
   0,                /* ver o registro na tela: acao */
-  0,                /* medidor de desempenho: DESLIGADO (V_MEDIDOR: 0 = Desligado) */
+  1,                /* medidor de desempenho: DESLIGADO (V_MEDIDOR: 0 = Desligado) */
   0,                /* guia de uso: acao */
   0, 0, 0,          /* pacote de selos (espelho de selospacote_ativo), adicionar e remover: o embutido */
-  UI_SIZE_AUTO,     /* Untouched interface size follows the physical panel. */
+  8,     /* Untouched interface size follows the physical panel. */
   2,                /* fundo: Frost desde a 2.0 (FUNDO_FROST; dono, 05/10/2026) */
   0,                /* glass opacity: 60%, owner default */
   2,                /* frosted glass: Automatic */
@@ -214,14 +217,14 @@
   1, /* experimental trailer zoom, .tpk only: Desligado (V_LIGA: 1 = Desligado) (#241) */
   0, /* plugins: action (state lives in plugins.c, F09) */
   1, 0, 0, 0, /* personal servers (F11): OFF (V_LIGA: 1 = Desligado); actions */
-  1, /* show advanced options (R6): Desligado (V_LIGA: 1 = Desligado) */
+  0, /* show advanced options (R6): Desligado (V_LIGA: 1 = Desligado) */
   0, 0, 0, 0, 0, /* second subtitle (R4): No topo; Automatico; Igual a principal x3 */
   0, 0, 0, 0, 0, 0, /* Emby (address, sign in, sign out) and Plex (sign in, server, sign out): actions */
   0, 0, /* automatic source (R9b): Equilibrio; HDR e Dolby Vision: Preferir */
   0, 0, /* 2.0 (N1): app logo: Novo; app opening: Padrao */
   0, /* receive polls (N3): Ligado (V_LIGA: 0 = Ligado) */
   0, /* search Cinemeta (#231): Ligado (V_LIGA: 0 = Ligado), as before */
-  3, /* rest screen delay (OLED): 2 min */
+  0, /* rest screen delay (OLED): 2 min */
   1, /* player UI brightness (OLED): 80% */
   0, /* 2.0 guide (Sobre e ajuda › Novidades 2.0): action */
   1, /* keep the video ready on exit: Desligado (V_LIGA: 1); retention costs memory */
@@ -241,12 +244,8 @@
   0, /* default aspect ratio: Ultimo usado */
   1, /* also in Continue watching (2.0.2): Desligado (V_LIGA: 1 = Desligado) = one title, one place */
   0, /* continue on the profile picker (#303): Ligado (V_LIGA: 0 = Ligado) = as before */
-#ifdef NV_TPK
-  1, /* DTS/TrueHD on the Samsung .tpk: 5.1 (Dolby Digital) (0 = off, 2 = stereo AAC) */
-#else
   0, /* DTS converted to: Estereo (AAC) = the proven path */
-#endif
-  1, /* Dolby Vision in MKV (2.0.2, experimental): Desligado */
+  0, /* Dolby Vision in MKV (2.0.2, experimental): Desligado */
   0, /* send history to the Nuvio account (2.0.2, per profile): Ligado */
   0, /* social features (2.0.2, per profile): Ligado */
   0, 0, /* add-on order (action; list lives in fonteregra.c) and use of it: Nao */
@@ -254,7 +253,7 @@
   0, /* warm connections when a title opens (2.0.2): Ligado */
   0, /* check several sources at once (2.0.2; only sources ready on the debrid): Ligado */
   1, /* prepare the source when a title opens (2.0.2): Desligado */
-  0, /* next episode in Continue watching (#203): Ligado */
+  1, /* next episode in Continue watching (#203): Ligado */
   0, 0, /* search (#311): Nuvio results First; show the source on result groups: Ligado */
   0, /* Settings layout (#339): Painel = the card grid and the art beside the list */
   0, /* P2P space limit (#334): Automatico */
@@ -298,9 +297,6 @@
   0, /* friends row: Feed (9A) */
   1, /* audio language in the automatic choice: off (V_LIGA 1), behaviour unchanged */
   0, /* second audio language: Da conta */
-#ifdef NV_ANDROID
-  0, /* Baixar registro: acao local, sem preferencia gravada */
-#endif
   0, 0, 0, /* shared exclusions parent, max-size view, release-group editor */
   120, 0, 0, 0, 0, 3, 1, 0, 1, 0, 0, /* primary style views; player.txt is authoritative */
   0, 0, 0, 0, 0, 0, 0, /* secondary appearance inherits primary, manual delay0 */
@@ -341,7 +337,7 @@
   0, /* experimental HDR menus: Off */
   0, /* clear cache action */
   0, /* tunneled playback: Off */
-  1, /* experimental P7 conversion: Off until explicitly enabled */
+  0, /* experimental P7 conversion: Off until explicitly enabled */
   1, /* log page on the local network (logrede.h): Desligado */
   2, /* player format style: Marks (V_PLR_FORMATO 2), the look the OSD always had */
   1, /* kids profile: Desligado (V_LIGA: 1); the state lives in perfilinfantil.c */

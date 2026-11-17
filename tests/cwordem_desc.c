@@ -29,6 +29,7 @@ Uint32 SDL_GetTicks(void) { return 0; }
 #include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
+#define NV_TEST_SERVIDORES_APENAS
 #include "jellyfin_stub.inc"
 
 // --- DUBLES: so fazem descoberta.c linkar (o conjunto de tests/cateps.c) -----
@@ -37,6 +38,7 @@ int ajustes_idioma(void) { return 0; }
 const char *i18n(const char *s)         { return s; }
 const char *idioma_mes_data(int mes, const char *nomePt) { (void)mes; return nomePt; }
 const char *dados_dir(void)             { return ""; }
+char *dados_caminho(char *d, unsigned n, const char *f) { (void)d; (void)n; (void)f; return 0; }
 const char *sessao_usuario(void)        { return ""; }
 int         perfis_ativo(void)          { return 1; }
 // A conta nao esta ligada nesta fixture: sessao fixa 0 (tests/stub_perfisessao.h).
@@ -158,7 +160,8 @@ int   ajustes_cw_concluido(void)           { return concluidoTeste; }
 int   ajustes_cw_minimo(void)             { return 1; }
 int ajustes_cw_mostrar_nao_exibidos(void) { return naoExibidosTeste; }
 #ifndef CW205_MONTAGEM
-int   ajustes_cw_proximo(void) { return 1; }
+static int proximoTeste = 1;
+int   ajustes_cw_proximo(void) { return proximoTeste; }
 #endif
 
 // --- O "TRAKT" FALSO ---------------------------------------------------------

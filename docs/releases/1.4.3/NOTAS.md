@@ -26,6 +26,6 @@ Fixes for the problems 1.4.2 introduced on Samsung — the Diagnostic freezing, 
 - If subtitles still fail, send a log right after choosing the track: the lines starting with `[legenda]`, `[mkv]` and `[mkvass]` say exactly why.
 
 ## Packages
-- `space.nuvio.native.legacy_1.4.3_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.4.3_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.4.3_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.4.3_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.4.3-tizen.wgt` — Samsung Tizen (WASM), unsigned; sign it with your own certificate as before.

@@ -47,8 +47,8 @@ Samsung .tpk: install this version by hand (see the #412 item above).
 
 | Platform | File |
 | --- | --- |
-| LG webOS 3+ | `space.nuvio.native.legacy_2.0.4_arm.ipk` |
-| LG with more RAM | `space.nuvio.native.legacy_2.0.4_arm-highcache.ipk` |
+| LG webOS 3+ | `com.mikhael.nuvio_2.0.4_arm.ipk` |
+| LG with more RAM | `com.mikhael.nuvio_2.0.4_arm-highcache.ipk` |
 | Samsung Tizen 4 / 5 / 5.5 | `Nuvio-2.0.4-NuvioTpk40.tpk` |
 | Samsung Tizen 6 | `Nuvio-2.0.4-NuvioTpk60.tpk` |
 | Samsung Tizen 6.5 / 7 | `Nuvio-2.0.4-NuvioTpk65.tpk` |

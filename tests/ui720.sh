@@ -22,7 +22,6 @@ if [ -f "$angle/libGLESv2.dylib" ] && [ -n "$ndk" ]; then
 else
   echo "SKIP GLES2 compiler check: existing ANGLE/NDK unavailable"
 fi
-python3 tests/ui720_surface.py
 printf 'animacoes 0\nidioma 1\nhomeLayoutLocal 0\n' > "$work/data/ajustes.txt"
 sources=()
 for source in src/*.c src/dts/*.c; do

@@ -222,6 +222,12 @@ void stream_preparar_dica_p2p(const Stream *l, int n) { (void)l; (void)n; }
 void stream_definir_lista_idade(const Stream *l, int n, Uint32 idade) {
   (void)idade; stream_definir_lista(l, n); }
 void stream_lista_acrescentar(const Stream *l, int n, int o) { (void)l; (void)n; (void)o; }
+int stream_publicar_alvo(const char *id,const Stream *l,int n,Uint32 idade) {
+ (void)id;stream_definir_lista_idade(l,n,idade);return 1;
+}
+int stream_acrescentar_alvo(const char *id,const Stream *l,int n,int o) {
+ (void)id;stream_lista_acrescentar(l,n,o);return 1;
+}
 void stream_invalidar(const char *p) { (void)p; }
 int stream_n(void) { return 0; }
 int stream_lista_do_alvo(const char *id) { (void)id; return 0; }

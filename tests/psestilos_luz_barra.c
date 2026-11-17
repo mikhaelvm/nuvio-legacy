@@ -15,7 +15,8 @@
 // --- DUBLES ------------------------------------------------------------------
 typedef struct { GfxRect r; GfxModo m; } RectChamado;
 static RectChamado rects[256];
-static int nRects;
+static int nRects, usarCache, blits;
+float gfx_opacidade_grupo = 1;
 static GfxRect cores[64];
 static int nCores;
 
@@ -37,6 +38,12 @@ int  gfx_efeitos_leves(void)  { return 0; }
 int  gfx_efeitos_minimos(void) { return 0; }
 float gfx_tex_aspect_atual, gfx_card_forcar_cover_atual, gfx_card_veu_tela_atual;
 
+int gfx_mini_ativo(void) { return 0; }
+int gfx_mini_alvo(GfxMini *m, int w, int h) { if (!usarCache) return 0; m->w=w; m->h=h; m->tex=1; return 1; }
+void gfx_mini_liberar(GfxMini *m) { memset(m, 0, sizeof *m); }
+void gfx_mini_comecar(GfxMini *m, float x, float y, float e) {(void)m;(void)x;(void)y;(void)e;}
+void gfx_mini_terminar(void) {}
+void gfx_mini_desenhar(const GfxMini *m,GfxRect r,float rad,float a) {(void)m;(void)r;(void)rad;(void)a;blits++;}
 int psparede_n(int i) { (void)i; return 0; }
 const char *psparede_url(int i, int k) { (void)i; (void)k; return 0; }
 void tex_cache_marcar_larg(int grupo, const char *u, float l, int e, int u2) {
@@ -100,6 +107,21 @@ int main(void) {
   confere("os veus de borda continuam", temModo(GFX_VEU_TOPO) && temModo(GFX_VEU_BAIXO));
   confere("Light has no coarse film grain (#657)", !temModo(GFX_TEXTO));
 
+  usarCache = 1;
+  psestilos_desenhar(&c, PS_FUNDO_LUZ, 1);
+  nRects = nCores = blits = 0;
+  for (i = 0; i < 60; i++) psestilos_atualizar(1.0f / 60.0f, &c, PS_FUNDO_LUZ);
+  psestilos_desenhar(&c, PS_FUNDO_LUZ, 1);
+  confere("fundo estatico usa uma composicao sem reconstruir", !nRects && !nCores && blits == 1);
+  c.luz[0] += 0.1f;
+  psestilos_desenhar(&c, PS_FUNDO_LUZ, 1);
+  confere("cores novas invalidam fundo", nRects > 0 && nCores > 0);
+  nRects = nCores = 0; c.reduzida = 1;
+  psestilos_desenhar(&c, PS_FUNDO_LUZ, 1);
+  confere("animacoes reduzidas invalidam a composicao", nRects > 0);
+  psestilos_aliviar(); nRects = nCores = 0;
+  psestilos_desenhar(&c, PS_FUNDO_LUZ, 1);
+  confere("aviso de memoria libera e reconstroi fundo", nRects > 0);
   puts("PASS: psestilos_luz_barra");
   return 0;
 }

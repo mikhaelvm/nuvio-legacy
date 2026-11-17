@@ -21,6 +21,6 @@ The SOCIAL tab lists your contacts under **Your friends** — photo (or initial)
 - **Seek timing in the log.** The automatic logs from 1.3.6 show that on Samsung the worst frames — 1 to 8.5 s with the main thread stopped — all come right after a seek, inside the player's `seekTo()`. This release logs `[video] seekTo bloqueou N ms` around that call so the next fix is aimed at the right thing (pause → seek → play, or seeking outside the frame) instead of guessed. Everything else on Samsung is unchanged from 1.3.6, which the AU7000 reporter calls "perfect".
 
 ## Packages
-- `space.nuvio.native.legacy_1.3.7_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.3.7_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
+- `com.mikhael.nuvio_1.3.7_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.3.7_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
 - `NuvioTV-1.3.7-tizen.wgt` — Samsung Tizen (WASM).

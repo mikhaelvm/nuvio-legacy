@@ -16,6 +16,6 @@ Two main-thread savings that the 1.3.5 logs pointed at. The new `longtask` line 
 - No functional changes.
 
 ## Packages
-- `space.nuvio.native.legacy_1.3.6_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.3.6_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
+- `com.mikhael.nuvio_1.3.6_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.3.6_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
 - `NuvioTV-1.3.6-tizen.wgt` — Samsung Tizen (WASM).

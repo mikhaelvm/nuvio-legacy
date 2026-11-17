@@ -32,8 +32,8 @@ Logs: `/Volumes/ExternalSSD/nv172-b71471bc-android-build.log`, `/Volumes/Externa
 | `libnuvio-1.7.2-tpk-arm.so` | 9863240 | `a448c376baa8fef0d3dd3bb0e6590126e43609783daf35da492530a0658944c8` |
 | `libnuvio-1.7.2-tpk40-arm.so` | 9867320 | `9e4f1d7d46d23bc13c49fd3c83ba1fdd7c3be1abda6f7b49324106a84a0de834` |
 | `repo.json` | 1310 | `f2236e5e040791ded28a6e3aaaa8465c66ebaa963a08dc9a405c0db17686becf` |
-| `space.nuvio.native.legacy_1.7.2_arm-highcache.ipk` | 51056670 | `44836dfc39b459b51903bb46cce350357ff6e585d1bbdf1f7bf8f56a156b894a` |
-| `space.nuvio.native.legacy_1.7.2_arm.ipk` | 51056254 | `edcb17a9393f85363e4ee14b5b1e45c5a0062a923da7ec1ce3f09c6d434b42a4` |
+| `com.mikhael.nuvio_1.7.2_arm-highcache.ipk` | 51056670 | `44836dfc39b459b51903bb46cce350357ff6e585d1bbdf1f7bf8f56a156b894a` |
+| `com.mikhael.nuvio_1.7.2_arm.ipk` | 51056254 | `edcb17a9393f85363e4ee14b5b1e45c5a0062a923da7ec1ce3f09c6d434b42a4` |
 | `webosbrew.manifest.json` | 633 | `d56446fa0e1fc45dcbf596ec97b19a28b4ac1ce5be83cbad4715a67e9e699813` |
 
 O décimo terceiro anexo é `SHA256SUMS`; `shasum -a 256 -c SHA256SUMS` aprovou os 12 arquivos. Logs, relatórios e configurações não são anexos públicos.

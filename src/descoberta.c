@@ -37,6 +37,7 @@
 #include "servidores.h"
 #include "descdebounce.h"
 #include "nlanc.h"
+#include <limits.h>
 #include <stdint.h>   /* uintptr_t: a geracao viaja no argumento do fio */
 #include <stdio.h>
 #include <string.h>
@@ -2750,11 +2751,7 @@ static int lerManifesto(int iAddon, const char *base, Decl *saida, int max,
 // Android, com fileiras ilimitadas (2.0.4), 200 fileiras seriam 75 MB so de
 // baldes. Fatiando em 24 a rodada custa no maximo ~9 MB e a home continua sendo
 // publicada fileira a fileira; a ordem nao muda porque o cursor e o mesmo.
-#ifdef NV_ANDROID
-#define CAT_RODADA_MAX 24
-#else
 #define CAT_RODADA_MAX CAT_FIL_MAX   // nas TVs o teto ja cabe numa rodada: nada muda
-#endif
 static int catRodadaTamanho(int alvo) {
   return alvo > CAT_RODADA_MAX ? CAT_RODADA_MAX : alvo;
 }
@@ -3369,6 +3366,34 @@ static void localizarContinuarPublicado(void);
 // (shouldUseSupabaseWatchProgressSync) e quando sync.c os aplica. Com um deles
 // vinculado, o "a seguir" ja vem dele.
 #define CONTA_JANELA_MS (60LL * 24 * 3600 * 1000)
+static int contaSementesProgresso(ContaSemente *sem, int nSem) {
+  // Completed checkpoints are also a Next Up source in the official client.
+  // They need not yet have a matching row in watched_items on another device.
+  if (nSem < 0) nSem = 0;
+  int nProg = prog_ler(contRegs, PROG_MAX);
+  for (int q = 0; q < nProg; q++) {
+    const ProgRegistro *pr = &contRegs[q];
+    if (pr->episodio <= 0 || pr->episodio == INT_MAX || pr->durSeg < 60 ||
+        pr->posSeg * 100.0 < pr->durSeg * ajustes_cw_concluido()) continue;
+    int newer = 0;
+    for (int v = 0; v < q; v++)
+      if (!strcmp(contRegs[v].contentId, pr->contentId)) { newer = 1; break; }
+    if (newer) continue;
+    int slot = -1;
+    for (int v = 0; v < nSem; v++)
+      if (!strcmp(sem[v].id, pr->contentId)) { slot = v; break; }
+    if (slot >= 0 && sem[slot].vistoMs >= pr->lastWatchedMs) continue;
+    if (slot < 0) {
+      if (nSem >= PROX_MAX_BUSCAS) continue;
+      slot = nSem++;
+    }
+    snprintf(sem[slot].id, sizeof sem[slot].id, "%s", pr->contentId);
+    sem[slot].temporada = pr->temporada;
+    sem[slot].episodio = pr->episodio + 1;
+    sem[slot].vistoMs = pr->lastWatchedMs;
+  }
+  return nSem;
+}
 static int contaASeguir(CatItem *lista, int n, int max, int comOutraFonte) {
   static ContaSemente sem[PROX_MAX_BUSCAS];
   static const char *ids[PROX_MAX_BUSCAS];
@@ -3376,15 +3401,9 @@ static int contaASeguir(CatItem *lista, int n, int max, int comOutraFonte) {
   CatItem *lote;
   int nSem, nLote = 0, i, j, confirmados, entraram = 0;
   int fVelho = 0, fVisto = 0, fPausado = 0;
-  if (!ajustes_cw_proximo()) { descCwoDefinir(cwo_conta_definir, NULL, 0); return n; }
   nSem = contalib_sementes_a_seguir(sem, PROX_MAX_BUSCAS,
                                     ajustes_cw_do_episodio_mais_alto());
-  if (nSem < 0) {
-    printf("[desc] continuar assistindo: a seguir da conta: vistos da conta nao puxados "
-           "ou velhos; nenhuma semente\n");
-    descCwoDefinir(cwo_conta_definir, NULL, 0);
-    return n;
-  }
+  nSem = contaSementesProgresso(sem, nSem);
   if (nSem < 1) { descCwoDefinir(cwo_conta_definir, NULL, 0); return n; }
   lote = (CatItem *)malloc(sizeof(CatItem) * PROX_MAX_BUSCAS);
   if (!lote) { descCwoDefinir(cwo_conta_definir, NULL, 0); return n; }
@@ -3654,6 +3673,7 @@ static int montarContinuar(CatItem *saida, int max) {
     static const char *futIds[CONT_MAX * 3];
     long long agora = (long long)time(NULL) * 1000LL;
     int modo = ajustes_cw_ordem(), naoExibidos = ajustes_cw_mostrar_nao_exibidos();
+    int contaProximo = querConta && (fonte == AJ_CWF_CONTA || (!trakt_ativo() && !simkl_ativo()));
     int proxFora = 0, escondidos = 0, semData = 0, principal, nFut = 0, mp, mf, w = 0;
     for (i = 0; i < nJ; i++) {
       const CatItem *c = juntos[i].item;
@@ -3662,7 +3682,7 @@ static int montarContinuar(CatItem *saida, int max) {
       // "PROXIMO EPISODIO NO CONTINUAR" desligado (#203): sai todo item que e o
       // PROXIMO — o "a seguir" e o episodio terminado que o card trocaria pelo
       // seguinte (continuar_desenhar). Fica so o que esta em andamento.
-      if (!ajustes_cw_proximo() &&
+      if (!ajustes_cw_proximo() && !contaProximo &&
           (x.aSeguir || (!strcmp(c->tipo, "series") && c->temporada >= 0 && c->episodio > 0 &&
                          c->progresso >= ajustes_cw_concluido()))) {
         proxFora++;
@@ -3830,6 +3850,7 @@ fim:
 }
 
 void desc_refazer_continuar(void) {
+  if (perfis_precisa_escolher()) return;
   pthread_t t;
   NvPerfilSessao *sessao;
   pthread_mutex_lock(&cwFilaTrava);
@@ -6076,14 +6097,8 @@ static struct { char id[256]; char *corpo; unsigned uso; time_t quando; } metaCa
 static unsigned metaRelogio;
 static pthread_mutex_t metaTrava = PTHREAD_MUTEX_INITIALIZER;
 #define META_TTL_S (6 * 60 * 60)
-#ifdef __EMSCRIPTEN__
-#include "dados.h"
-#define META_FS_TRAVAR() dados_fs_travar()
-#define META_FS_LIBERAR() dados_fs_liberar()
-#else
 #define META_FS_TRAVAR() ((void)0)
 #define META_FS_LIBERAR() ((void)0)
-#endif
 const char *dados_dir(void);
 static void metaChaveContexto(const char *id, char *dst, size_t n) {
   const char *usuario = sessao_usuario();
@@ -6136,9 +6151,6 @@ static void metaDiscoGravar(const char *chave, const char *corpo) {
   if (ok) ok = rename(tmp, nome) == 0;
   if (!ok) remove(tmp);
   META_FS_LIBERAR();
-#ifdef __EMSCRIPTEN__
-  if (ok) dados_marcar_sujo(1);
-#endif
 }
 static char *metaCacheObter(const char *id) {
   char chave[256], msg[220];
@@ -6255,6 +6267,13 @@ static char *metaDoAddonT(int i, const char *tipo, const char *id, int prazo) {
   else metaNegGuardar(chave);
   return c;
 }
+/* Catalog providers first, in installed order; other meta providers fill gaps. */
+static int metaIndice(int pos) {
+  int n=addons_n();
+  for(int pass=0;pass<2;pass++) for(int i=0;i<n;i++)
+    if ((addons_fornece(i,ADD_CATALOGO)!=0)==(pass==0) && pos--==0) return i;
+  return -1;
+}
 static char *metaDoAddon(int i, const char *tipo, const char *id) {
   return metaDoAddonT(i, tipo, id, 15);
 }
@@ -6277,16 +6296,18 @@ static int metaTextos(const char *corpo, char *tit, size_t nt, char *sin, size_t
 // Titulo e sinopse do primeiro addon de metadados ativo que conhece `id`.
 static int textoDoAddon(const char *tipo, const char *id, char *tit, size_t nt,
                         char *sin, size_t ns, const char **nomeAddon) {
-  int i, n = addons_n();
-  for (i = 0; i < n; i++) {
-    char *c = metaDoAddon(i, tipo, id);
-    int ok;
-    if (!c) continue;
-    ok = metaTextos(c, tit, nt, sin, ns);
+  tit[0]=sin[0]=0;
+  for (int order=0;order<addons_n();order++) {
+    int i=metaIndice(order);
+    char *c=metaDoAddon(i,tipo,id), t[160]="", d[900]="";
+    if (c && metaTextos(c,t,sizeof t,d,sizeof d)) {
+      if (!tit[0] && t[0]) { snprintf(tit,nt,"%s",t); if(nomeAddon)*nomeAddon=addons_nome(i); }
+      if (!sin[0] && d[0]) snprintf(sin,ns,"%s",d);
+    }
     free(c);
-    if (ok) { if (nomeAddon) *nomeAddon = addons_nome(i); return 1; }
+    if (tit[0] && sin[0]) break;
   }
-  return 0;
+  return tit[0] || sin[0];
 }
 
 // Titulo e sinopse do TMDB no idioma configurado: /find + /tv|movie/<id>.
@@ -6355,23 +6376,24 @@ static int arteDoAddon(const char *tipo, const char *id, char *logo, size_t nl,
                        char *fundo, size_t nf) {
   int i, n = addons_n();
   logo[0] = fundo[0] = 0;
-  for (i = 0; i < n; i++) {
+  for (int order = 0; order < n; order++) {
+    i=metaIndice(order);
     char *c = metaDoAddon(i, tipo, id);
     const char *m = c ? strstr(c, "\"meta\"") : NULL;
     if (m) {
       m += 6;
       while (*m == ' ' || *m == ':' || *m == '\n' || *m == '\t' || *m == '\r') m++;
       if (*m == '{') {
-        urlArteInteira(m, NULL, "logo", 1, logo, nl, id);
-        urlArteInteira(m, NULL, "background", 1, fundo, nf, id);
+        if (!logo[0]) urlArteInteira(m, NULL, "logo", 1, logo, nl, id);
+        if (!fundo[0]) urlArteInteira(m, NULL, "background", 1, fundo, nf, id);
         if (ehSvg(logo) || strncmp(logo, "http", 4)) logo[0] = 0;
         if (ehSvg(fundo) || strncmp(fundo, "http", 4)) fundo[0] = 0;
       }
     }
     free(c);
-    if (logo[0] || fundo[0]) return 1;
+    if (logo[0] && fundo[0]) return 1;
   }
-  return 0;
+  return logo[0] || fundo[0];
 }
 
 // Cache do texto localizado: um pedido por titulo e por idioma, nao um por
@@ -6393,7 +6415,7 @@ static int locProx;
 static pthread_mutex_t locTrava = PTHREAD_MUTEX_INITIALIZER;
 
 static void locChave(char *dst, size_t n, const char *tipo, const char *id) {
-  snprintf(dst, n, "%s/%s/%s/%d", tipo, id, desc_tmdb_idioma(), ajustes_meta_externo());
+  snprintf(dst, n, "v3/%s/%s/%s/%d", tipo, id, desc_tmdb_idioma(), ajustes_meta_externo());
 }
 
 // 1 = achou entrada valida; *ok diz se ha texto. Entrada negativa vencida = 0.
@@ -6405,7 +6427,7 @@ static int locLerEx(const char *chave, char *tit, size_t nt, char *sin, size_t n
   for (i = 0; i < LOC_N; i++) {
     if (!locCache[i].chave[0] || strcmp(locCache[i].chave, chave)) continue;
     if (!locCache[i].ok && time(NULL) - locCache[i].quando > 600) break;
-    if (locCache[i].doDisco && !disco) break;
+    if (locCache[i].doDisco && !disco && time(NULL) - locCache[i].quando > 86400) break;
     *ok = locCache[i].ok;
     if (*ok) {
       snprintf(tit, nt, "%s", locCache[i].titulo);
@@ -6444,16 +6466,9 @@ static void locGuardar(const char *chave, const char *tit, const char *sin,
 // perfil), como no cache do catalogo: a url de arte de addon pode carregar
 // configuracao, e arquivo de outra conta e descartado. Sem pasta gravavel
 // (dados_dir vazio, os testes) nao ha arquivo e tudo segue so na memoria.
-#ifdef __EMSCRIPTEN__
-#include "dados.h"
-#define LOC_FS_TRAVAR()   dados_fs_travar()
-#define LOC_FS_LIBERAR()  dados_fs_liberar()
-#define LOC_MARCAR_SUJO() dados_marcar_sujo(1)
-#else
 #define LOC_FS_TRAVAR()   ((void)0)
 #define LOC_FS_LIBERAR()  ((void)0)
 #define LOC_MARCAR_SUJO() ((void)0)
-#endif
 const char *dados_dir(void);
 static int locDiscoLido;
 
@@ -6507,7 +6522,7 @@ static void locSalvarDisco(void) {
     locEscapar(f, locCache[i].titulo);  fputc('\t', f);
     locEscapar(f, locCache[i].sinopse); fputc('\t', f);
     locEscapar(f, locCache[i].logo);    fputc('\t', f);
-    locEscapar(f, locCache[i].fundo);   fputc('\n', f);
+    locEscapar(f, locCache[i].fundo);   fprintf(f, "\t%ld\n", locCache[i].quando);
     n++;
   }
   pthread_mutex_unlock(&locTrava);
@@ -6552,10 +6567,11 @@ static void locLerDisco(void) {
     p = locCampo(p, locCache[vaga].titulo, sizeof locCache[vaga].titulo);
     p = locCampo(p, locCache[vaga].sinopse, sizeof locCache[vaga].sinopse);
     p = locCampo(p, locCache[vaga].logo, sizeof locCache[vaga].logo);
-    locCampo(p, locCache[vaga].fundo, sizeof locCache[vaga].fundo);
+    p = locCampo(p, locCache[vaga].fundo, sizeof locCache[vaga].fundo);
+    long gravadoEm = strtol(p, NULL, 10);
     locCache[vaga].ok = 1;
     locCache[vaga].doDisco = 1;
-    locCache[vaga].quando = (long)time(NULL);
+    locCache[vaga].quando = gravadoEm > 0 ? gravadoEm : 0;
     n++;
   }
   pthread_mutex_unlock(&locTrava);
@@ -6612,17 +6628,17 @@ static int localizarTexto(const char *tipo, const char *id, char *tit, size_t nt
   locChave(chave, sizeof chave, tipo, id);
   if (locLerEx(chave, tit, nt, sin, ns, logo, nl, fundo, nf, &lido, 0)) return lido;
   tit[0] = sin[0] = 0;
-  // Com a preferencia o addon vem primeiro SO em ingles (#209): num idioma
-  // que nao e o ingles o TMDB traduz antes, como na ficha do titulo.
-  if (externo && !naoIng) {
-    ok = textoDoAddon(tipo, id, tit, nt, sin, ns, NULL);
-  } else {
-    ok = textoDoTmdb(tipo, id, tit, nt, sin, ns,
-                     naoIng ? logoTmdb : NULL, sizeof logoTmdb);
-    if (!tit[0] && !sin[0]) ok = textoDoAddon(tipo, id, tit, nt, sin, ns, NULL);
-  }
+  ok = textoDoAddon(tipo, id, tit, nt, sin, ns, NULL);
   if (arteDoAddon(tipo, id, logo, nl, fundo, nf)) ok = 1;
-  if (!logo[0] && logoTmdb[0]) { snprintf(logo, nl, "%s", logoTmdb); ok = 1; }
+  if (!tit[0] || !sin[0] || !logo[0]) {
+    char t[160]="", d[900]="";
+    if (textoDoTmdb(tipo,id,t,sizeof t,d,sizeof d,!logo[0]?logoTmdb:NULL,sizeof logoTmdb)) {
+      if (!tit[0]) snprintf(tit,nt,"%s",t);
+      if (!sin[0]) snprintf(sin,ns,"%s",d);
+      if (!logo[0] && logoTmdb[0]) snprintf(logo,nl,"%s",logoTmdb);
+      ok = tit[0] || sin[0] || logo[0] || fundo[0];
+    }
+  }
   DESC_PUBLICAR(locGuardar(chave, tit, sin, logo, fundo, ok));
   return ok;
 }
@@ -6790,6 +6806,7 @@ static void localizarContinuarPublicado(void) {
 // sinopse (rede, ficha sem descricao) NAO sai do destaque: aparece sem ela, e
 // a falha vai para o log, com o id, para nao ser silencio.
 static void completarRaso(CatItem *dst, const char *corpo, const char *tipo);
+static void metaPreferida(CatItem *d, const char *tipo, const char *id);
 #define HSIN_LOTE 10
 #define HSIN_PAUSA_MS 150
 #define HSIN_NEG_N 32
@@ -6849,6 +6866,7 @@ int desc_sinopse_completar_item(CatItem *c, MetaprovGet get, void *ctx) {
   }
   if (!c->sinopse[0] && sin[0]) snprintf(c->sinopse, sizeof c->sinopse, "%s", sin);
   completarRaso(c, corpo, tipo);
+  if (!get) metaPreferida(c,tipo,id);
   free(corpo);
   if (!c->logo[0] && (tinhaSinopse || !c->sinopse[0])) return 0;
   if (!c->titulo[0] && tit[0]) snprintf(c->titulo, sizeof c->titulo, "%s", tit);
@@ -8128,6 +8146,10 @@ static int metaCompleta(const char *corpo) {
   char tit[160], sin[900], tp[16];
   if (!metaTextos(corpo, tit, sizeof tit, sin, sizeof sin) || !sin[0]) return 0;
   metaTipoProprio(corpo, tp, sizeof tp);
+  const char *m=strstr(corpo,"\"meta\""), *r=m?strchr(m,'{'):NULL;
+  const char *keys[]={"poster","background","logo","releaseInfo","runtime"};
+  for (int i=0;r && i<5;i++) { char value[512]; if(!js_texto_raiz_em(r,NULL,keys[i],value,sizeof value)||!value[0]) return 0; }
+  if (!r || !js_array(r,NULL,"genres") || !js_array(r,NULL,"cast")) return 0;
   if (!strcmp(tp, "movie")) return 1;
   return desc_meta_n_episodios(corpo) > 0;
 }
@@ -8277,9 +8299,9 @@ static int tentarFichaDoAddon(MetaFontes *mf, int i, const char *tipoItem, const
 // "Usar sempre o Cinemeta". Id do IMDb so quando o item veio de um addon que
 // nao e o Cinemeta (senao a origem JA e o Cinemeta e nada muda).
 static int catalogoPrimeiro(const CatItem *c) {
-  if (!c || !c->imdb[0] || ehCanal(c->tipo) || ajustes_meta_so_cinemeta()) return 0;
+  if (!c || !c->imdb[0] || ehCanal(c->tipo)) return 0;
   if (strncmp(c->imdb, "tt", 2)) return 1;
-  return addonDaOrigem(c->origem) >= 0;
+  return 1;
 }
 
 // Resolve as fontes na ordem acima. Devolve 1 quando o detalhe deve seguir o
@@ -8327,7 +8349,7 @@ static void *epCineBuscar(void *u) {
 }
 static int metaCatalogoResolver(const CatItem *orig, MetaFontes *mf, int indice) {
   char id[64];
-  int origem = addonDaOrigem(orig->origem), i, n = addons_n(), extras = 0;
+  int origem = -1, i, n = addons_n(), extras = 0; /* installed order owns priority */
   int ehImdb = !strncmp(orig->imdb, "tt", 2);
   ArmIds arm;
   int armFeito = 0;
@@ -8335,8 +8357,7 @@ static int metaCatalogoResolver(const CatItem *orig, MetaFontes *mf, int indice)
   const char *cid;
   EpCine cedo = { orig, indice, 1, epPedidoAtual(), NULL };
   pthread_t cineFio;
-  int paralelo = ehImdb && strcmp(orig->tipo, "movie") &&
-                 pthread_create(&cineFio, NULL, epCineBuscar, &cedo) == 0;
+  int paralelo = 0; /* consult fallback only after addon fields are known */
   memset(mf, 0, sizeof *mf);
   idbase_copiar(orig->imdb, id, sizeof id);
   // a) quem publicou
@@ -8347,7 +8368,8 @@ static int metaCatalogoResolver(const CatItem *orig, MetaFontes *mf, int indice)
     if (indice >= 0) metaPublicarPrimario(orig, mf->corpo[0], indice);
   }
   // b) outros addons de metadados, na ordem do usuario
-  for (i = 0; i < n && !epPedidoSaiu() && extras < 2 && (!mf->n || !metaCompleta(mf->corpo[0])); i++) {
+  for (int order = 0; order < n && !epPedidoSaiu() && extras < 2 && (!mf->n || !metaCompleta(mf->corpo[0])); order++) {
+    i = metaIndice(order);
     int r;
     const char *qid = id;
     if (i == origem) continue;
@@ -8392,7 +8414,7 @@ static int metaCatalogoResolver(const CatItem *orig, MetaFontes *mf, int indice)
   // c) o Cinemeta completa o que faltar (ou e a base, se nenhum addon serviu).
   // "tmdb:" sem IMDb na ficha: o catalogo do Nuvio resolve o proprio id (#555).
   cid = mf->tt[0] ? mf->tt : (!strncmp(id, "tmdb:", 5) ? id : "");
-  if (cid[0]) {
+  if (cid[0] && (!mf->n || !metaCompleta(mf->corpo[0]))) {
     int fil = 1;
     char tp[16] = "";
     char *cm;
@@ -8438,6 +8460,53 @@ static void fichaDe(CatItem *d, const char *corpo, int soVazios) {
     }
   }
   if (!soVazios || !d->pais[0]) js_texto(corpo, NULL, "country", d->pais, sizeof d->pais);
+}
+
+
+static void metaPreferida(CatItem *d, const char *tipo, const char *id) {
+  CatItem *p = calloc(1, sizeof *p);
+  if (!p) return;
+  snprintf(p->tipo, sizeof p->tipo, "%s", tipo);
+  for (int order = 0; order < addons_n() && descSessaoAtual(); order++) {
+    int i=metaIndice(order);
+    if (epPedidoAtual() && epPedidoSaiu()) break;
+    if (!addons_fornece(i, ADD_META)) continue;
+    if (addons_aceita_id(i, tipo, id) == 0) continue;
+    char *c = metaDoAddonT(i, tipo, id, 8);
+    const char *m = c ? strstr(c, "\"meta\"") : NULL;
+    const char *r = m ? strchr(m + 6, '{') : NULL;
+    if (r && metaprov_meta_valido(c)) {
+#define TEXTO(campo, chave) if (!p->campo[0]) js_texto_raiz_em(r, NULL, chave, p->campo, sizeof p->campo)
+      TEXTO(titulo, "name"); TEXTO(sinopse, "description");
+      TEXTO(meta, "releaseInfo"); TEXTO(pais, "country");
+#undef TEXTO
+#define ARTE(campo, chave) if (!p->campo[0]) { urlArteInteira(r, NULL, chave, 1, p->campo, sizeof p->campo, id); if (ehSvg(p->campo) || strncmp(p->campo,"http",4)) p->campo[0]=0; }
+      ARTE(poster, "poster"); ARTE(backdrop, "background"); ARTE(logo, "logo");
+#undef ARTE
+      if (p->logo[0] && !strcmp(p->logo,p->poster)) p->logo[0]=0;
+      fichaDe(p, c, 1);
+    }
+    free(c);
+  }
+#define COPIA(campo) if (p->campo[0]) snprintf(d->campo, sizeof d->campo, "%s", p->campo)
+  COPIA(titulo); COPIA(sinopse); COPIA(meta); COPIA(pais); COPIA(genero);
+  COPIA(poster); COPIA(backdrop); COPIA(logo); COPIA(direcao);
+#undef COPIA
+  if (p->backdrop[0]) snprintf(d->backdropCatalogo, sizeof d->backdropCatalogo, "%s", p->backdrop);
+  if (p->logo[0]) { d->logoIdioma[0]=d->logoIdiomaUrl[0]=0; }
+  if (p->nota > 0) d->nota = p->nota;
+  if (p->nElenco > 0) {
+    for (int i=0;i<p->nElenco;i++) for (int j=0;j<d->nElenco;j++) {
+      if (!strcmp(p->elenco[i].nome,d->elenco[j].nome)) {
+        if (!p->elenco[i].foto[0]) snprintf(p->elenco[i].foto,sizeof p->elenco[i].foto,"%s",d->elenco[j].foto);
+        if (!p->elenco[i].papel[0]) snprintf(p->elenco[i].papel,sizeof p->elenco[i].papel,"%s",d->elenco[j].papel);
+        if (!p->elenco[i].tmdb) p->elenco[i].tmdb=d->elenco[j].tmdb;
+        break;
+      }
+    }
+    d->nElenco=p->nElenco; memcpy(d->elenco,p->elenco,sizeof d->elenco);
+  }
+  free(p);
 }
 
 // As fontes de COMPLEMENTO (a partir da segunda) preenchem o que a base deixou
@@ -8726,6 +8795,7 @@ static void *buscarEps(void *u) {
             } } }
     completarRaso(&edit, corpo, ehFilme ? "movie" : "series");
     if (viaCatalogo) completarFicha(&edit, &mf, ehFilme ? "movie" : "series");
+    metaPreferida(&edit, orig->tipo, orig->imdb);
     // A logo e a ficha basica nao esperam a traducao/fotos opcionais.
     alvoItem = epPublicacaoIniciar(alvoItem);
     if (alvoItem >= 0) {
@@ -8750,7 +8820,7 @@ static void *buscarEps(void *u) {
         // num app e num TMDB em portugues. No web (metaDetailsScreen.js) o
         // "Titulo e sinopse" do TMDB vence a ficha de qualquer addon; o vazio
         // do TMDB (sem traducao) continua deixando o texto do addon.
-        int tmdbPorCima = tmdbTraduz && idiomaNaoIngles();
+        int tmdbPorCima = 0; /* addon fields take precedence */
         snprintf(edit.titulo, sizeof edit.titulo, "%s", tA);
         if (!tmdbPorCima) manter |= DESC_MANTER_TITULO;
         if (sA[0]) {
@@ -8822,6 +8892,7 @@ static void *buscarEps(void *u) {
           fotosDoElenco(&edit, tt, !strcmp(it->tipo, "series"), manter);
         } else { printf("[desc] elenco %s: id fora do IMDb, sem fotos (meta pedido como %s)\n", it->imdb, serie); fflush(stdout); }
       } }
+    metaPreferida(&edit, orig->tipo, orig->imdb);
     // AS ABAS NAO SAO DESTA CAUDA (#372). Ela roda com fioEpVivo ja solto: o
     // mesmo titulo reaberto (bloco de episodios reciclado) publica outra lista
     // com outras abas, e republicar o `edit` inteiro devolvia as abas velhas

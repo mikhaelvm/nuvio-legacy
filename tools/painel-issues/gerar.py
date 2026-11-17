@@ -138,8 +138,8 @@ def main():
                 with open(path, encoding="utf-8") as f:
                     html = f.read()
                 html = html.replace('lang="pt-BR"', 'lang="en"').replace(
-                    '<title>Nuvio Legacy - issues e roadmap</title>',
-                    '<title>Nuvio Legacy - issues and roadmap</title>').replace(
+                    '<title>Nuvio - issues e roadmap</title>',
+                    '<title>Nuvio - issues and roadmap</title>').replace(
                     'aria-label="Navegação"', 'aria-label="Navigation"').replace(
                     '<a href="#ajudar">Como ajudar</a>', '<a href="#ajudar">How to help</a>')
                 with open(path, "w", encoding="utf-8") as f:

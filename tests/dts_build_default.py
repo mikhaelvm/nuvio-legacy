@@ -64,7 +64,7 @@ if enabled:
 import os,pathlib,shutil,subprocess,sys
 args=sys.argv[1:]
 remote=os.environ['FIXTURE_REMOTE']
-prefix='/media/developer/apps/usr/palm/applications/space.nuvio.native.legacy'
+prefix='/media/developer/apps/usr/palm/applications/com.mikhael.nuvio'
 if 'scp' in args:
     source,destination=args[-2:]
     target=pathlib.Path(destination.split(':',1)[1].replace(prefix,remote))

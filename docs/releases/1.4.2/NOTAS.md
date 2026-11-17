@@ -29,8 +29,8 @@ Magic Remote cursor on LG (#99), anime ASS subtitles drawn by the app and in syn
 - The Diagnostic report contains measurements (times, sizes, memory, add-on hosts without paths or keys). No passwords, tokens or personal lists.
 
 ## Packages
-- `space.nuvio.native.legacy_1.4.2_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.4.2_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.4.2_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.4.2_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.4.2-tizen.wgt` — Samsung Tizen (WASM), unsigned; sign it with your own certificate as before.
 
 ## Screenshots

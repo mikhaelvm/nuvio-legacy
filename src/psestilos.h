@@ -37,6 +37,7 @@ typedef struct {
 } PSCena;
 
 void psestilos_iniciar(void);
+void psestilos_aliviar(void);
 void psestilos_atualizar(float dt, const PSCena *c, int modo);
 void psestilos_desenhar(const PSCena *c, int modo, float alfa);
 

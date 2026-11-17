@@ -16,7 +16,7 @@
 
 // Targets with a system (IME) keyboard the "Teclado" setting can choose between:
 // Android, LG webOS, Samsung Tizen (.tpk and .wgt). Elsewhere the option is hidden.
-#if defined(NV_ANDROID) || defined(NV_WEBOS) || defined(NV_TPK) || defined(__EMSCRIPTEN__)
+#if defined(NV_WEBOS)
 #define NV_TECLADO_SIS 1
 #endif
 
@@ -40,7 +40,6 @@ int  ajustes_pediu_diagnostico(void);
 // OK em "Teste de velocidade" (Ajustes › Diagnóstico). Lido e zerado pelo app.c.
 int  ajustes_pediu_velocidade(void);
 // Itens da barra lateral que a pessoa pode esconder (#162). 1 = aparece.
-int  ajustes_menu_explorar(void);
 int  ajustes_menu_guia(void);
 int  ajustes_menu_agenda(void);
 int  ajustes_menu_perfil(void);
@@ -84,7 +83,7 @@ int  ajustes_pediu_novidades(void);
 int  ajustes_guia_aberto(void);
 // Os atalhos "Abrir o Guia de TV / a Biblioteca / a Agenda / o Explorar /
 // Perfil e Stats" do guia: 1..5 na ordem, lido e zerado pelo app.c.
-enum { AJ_TELA_GUIA_TV = 1, AJ_TELA_BIBLIOTECA, AJ_TELA_AGENDA, AJ_TELA_EXPLORAR, AJ_TELA_PERFIL };
+enum { AJ_TELA_GUIA_TV = 1, AJ_TELA_BIBLIOTECA, AJ_TELA_AGENDA, AJ_TELA_RESERVADA, AJ_TELA_PERFIL };
 int  ajustes_pediu_tela(void);
 // O guia para o Spotlight no modo guia (spot_abrir_guia): as entradas que
 // casam com `consulta` (titulo antes de texto), os textos de cada uma e a
@@ -141,7 +140,6 @@ int ajustes_pausa_notas(void);
 int ajustes_pausa_elenco(void);
 int ajustes_classif_player(void);   // 1 = mostra a classificacao/guia parental no player (padrao)
 // "O que achou?" nos creditos (reacao.h). Ligado de fabrica.
-int ajustes_reacao_creditos(void);
 // Formato do player (4K, HDR, Atmos, idioma do audio). Estilo: PLR_FMT_*; padrao
 // Pilula; a posicao e outro ajuste (PLR_POS_*).
 enum { PLR_FMT_TEXTO = 0, PLR_FMT_PILULA, PLR_FMT_MARCAS, PLR_FMT_SELOS, PLR_FMT_OFF, PLR_FMT_N };
@@ -601,9 +599,8 @@ int   ajustes_legenda_forcada_auto(void);    // #287: 1 = audio in the subtitle 
 int   ajustes_legenda_sync_auto(void);       // local, ligada por padrão
 int   ajustes_audio_offset_ms(void);        // Converted audio presentation, -500..500 ms; default 0.
 int   ajustes_legenda_sync_audio(void);      // 1 = offer "Por audio" in subtitle AutoSync (F06; local, default off)
-int   ajustes_trailer_zoom_tpk(void);        // #241: 1 = experimental trailer zoom on the native .tpk (local, default off)
 int   ajustes_teclado_na_tela(void);         // times the Teclado option is on the Ajustes list (0 = hidden here)
-int   ajustes_teclado_android(void);          // Android keyboard: 0 automatic, 1 app grid, 2 system IME (local)
+int   ajustes_teclado_modo(void);          // Android keyboard: 0 automatic, 1 app grid, 2 system IME (local)
 int   ajustes_mic_busca(void);               // Samsung (.tpk/.wgt) search mic button: 0 automatic, 1 on, 2 off (local)
 unsigned ajustes_p2p_limite_mb(void);           // #334: P2P space limit in MB (0 = Automatic)
 int   ajustes_p2p_usb(void);                    // #205: 1 = cache P2P em pendrive USB
@@ -665,10 +662,8 @@ int   ajustes_cw_mostrar_nao_exibidos(void);  // showUnairedNextUp
 // continueWatchingSortMode: 0 default, 1 streaming_style, 2 split_upcoming
 int   ajustes_cw_ordem(void);
 int   ajustes_dts_ac3(void);             // 1 = DTS convertido em AC3 5.1 (LG, e padrao no .tpk); 0 = AAC estereo (.tpk: ou desligado)
-int   ajustes_dts_tpk_modo(void);        // .tpk: DTSTPK_HLS, ou DTSTPK_DESLIGADO com a conversao desligada
 int   ajustes_ps_continuar(void);        // #303: 0 = sem o cartao "continuar" na escolha de perfil
 int   ajustes_hist_conta(void);          // 1 = this profile's history goes to the Nuvio account (per profile, default on)
-int   ajustes_amigos_estilo(void); // 0 Feed, 1 Live, 2 Stories, 3 Presence, 4 Poster, 5 Classic
 int   ajustes_social(void);              // 1 = friends/social features on (per profile, default on)
 int   ajustes_dv_mkv(void);              // 1 = Dolby Vision MKV through our demux (webOS, local, default off)
 int   ajustes_dv7(void);

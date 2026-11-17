@@ -14,9 +14,7 @@
 
 // Isolated session fixtures may omit the profile producer; complete apps
 // always link it. Token boundaries invalidate ownership without UI callbacks.
-#if defined(__APPLE__) && (defined(__GNUC__) || defined(__clang__))
-extern void perfis_invalidar_sessao(void) __attribute__((weak_import));
-#elif defined(__GNUC__) || defined(__clang__)
+#if (defined(__GNUC__)) || (defined(__clang__))
 extern void perfis_invalidar_sessao(void) __attribute__((weak));
 #else
 #include "perfis.h"
@@ -526,9 +524,6 @@ static void *fioPedir(void *u) {
   char tok[TOKMAX];
   int st = 0, precisaAnon;
   (void)u;
-#ifdef NV_TPK40
-  nv_tpk40_etapa("note sign-in-thread started");   // rastro do Tizen 4/5 (#180)
-#endif
   erro[0] = 0;
   codigo[0] = 0;
   urlLogin[0] = 0;

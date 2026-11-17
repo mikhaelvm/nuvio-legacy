@@ -17,8 +17,8 @@ int main(void) {
   assert(strcmp(NV_APP_ID,NV_APP_ID_PRODUCTION));
   assert(strstr(NV_LS_MEDIA_CLIENT,NV_APP_ID));
 #else
-  assert(!strcmp(NV_APP_ID,"space.nuvio.native.legacy"));
-  assert(!strcmp(NV_LS_MEDIA_CLIENT,"com.webos.media.client.nuvio"));
+  assert(!strcmp(NV_APP_ID,"com.mikhael.nuvio"));
+  assert(!strcmp(NV_LS_MEDIA_CLIENT,"com.webos.media.client.com.mikhael.nuvio"));
 #endif
   assert(dts_playback_enabled()==supported);
   /* Launch-variable opt-in is no longer required, including on production. */

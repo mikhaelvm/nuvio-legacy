@@ -150,7 +150,7 @@ extern float nv_grad_viva[3][3];
 extern int   nv_grad_ativo;
 // Luz ambiente (imersiva): as quatro cores de regiao, a forca 0..1 (entra e
 // sai com o modo) e o relogio em segundos para a "respiracao" (0 com
-// animacoes reduzidas: a luz fica parada).
+// esta variante mantem a luz parada).
 extern float nv_ambiente_viva[4][3];
 extern float nv_ambiente_forca;
 extern float nv_tempo_viva;

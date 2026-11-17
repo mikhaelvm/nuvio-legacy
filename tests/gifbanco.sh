@@ -2,7 +2,6 @@
 # Bancada do decodificador nativo de GIF (#84), no Mac.
 #
 #   bash tests/gifbanco.sh              gera os GIFs e mede
-#   bash tests/gifbanco.sh --so-gerar   so gera (tests/gifbanco-tizen.sh usa)
 #
 # OS GIFS SAO GERADOS, com o ffmpeg, nos tamanhos dos registros do #84 e do
 # orcamento da 1.4.6: 35 quadros 512x512 (avatar de 1050 ms), 75 quadros

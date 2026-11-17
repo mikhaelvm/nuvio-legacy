@@ -40,7 +40,6 @@ if [ "${NV_P2P_DLOPEN:-0}" = 1 ]; then
   cc -c -O1 -g "${san[@]}" -DNV_P2P_MOTOR -DNV_P2P_MOTOR_DLOPEN -Isrc -I"$E/include" \
     src/p2pmotor_motor.c -o "$T/p2pmotor_motor.o"
   # A .so do motor exporta so a API C (NUVIO_ENGINE_BUILD_SHARED, como a do
-  # .tpk em tools/p2p-motor/build-tpk.sh): NV_ENGINE_SO aponta para ela.
   S="${NV_ENGINE_SO:-}"
   [ -n "$S" ] && [ -f "$S" ] || { echo "p2pmotor_real: SKIP dlopen (sem NV_ENGINE_SO)"; exit 0; }
   cp "$S" "$T/libnuvio_engine.so"

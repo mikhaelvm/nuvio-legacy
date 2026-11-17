@@ -1,0 +1,28 @@
+name: webOS source and release checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Check source boundary and release integrity
+        run: |
+          python3 tests/webos_only.py
+          python3 tests/app_identity.py
+          python3 tests/release.py
+          bash -n tools/arm.sh tools/release.sh tools/env.sh tools/rust-mkvcore.sh tools/build-dts-ffmpeg.sh tools/p2p-motor/pasta.sh
+      - name: Check LG resource policies and version detection
+        run: |
+          cc -std=gnu11 -Isrc tests/diagnostico.c src/perfiltv.c -o /tmp/nuvio-policy
+          /tmp/nuvio-policy
+          cc -std=gnu11 -Isrc tests/trailerimdb_auto.c src/perfiltv.c -o /tmp/nuvio-trailer
+          /tmp/nuvio-trailer
+          bash tests/diagnostico_dispatch.sh
+          bash tests/webosver.sh

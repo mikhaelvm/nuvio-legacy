@@ -3,7 +3,7 @@
 
 // A CURADORIA DA FILEIRA HEROI (#205). A fileira "Herói" da Home é um cartão
 // único do tamanho da fileira; este módulo é a terceira fonte dele: uma
-// recomendação de filme que o Nuvio Legacy manda, lida de um JSON estático.
+// recomendação de filme que o Nuvio manda, lida de um JSON estático.
 //
 // POR QUE ARQUIVO E NÃO O SERVIDOR DE RECOMENDAÇÕES: /v1/rec do
 // servidor/recomendacoes é a recomendação ENTRE AMIGOS — quem manda é uma

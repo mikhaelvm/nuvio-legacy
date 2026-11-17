@@ -33,7 +33,7 @@ Quem assume: este é o documento ÚNICO do que falta para publicar a 2.0. Termin
 
 ### NÃO entra na 2.0
 
-- **PR #259 (DTS no webOS)**: testado na C9 na branch `test/dts-259` (`/Volumes/ExternalSSD/nuvio-dts-259`). A C9 toca DTS sozinha (o caminho do PR nem liga). Nas duas vezes em que o PR entrou (Top Gun, AIOStreams 2160p), falhou: `Selected DTS track or video absent` (provável TrueHD, não DTS) e `Container open: Input/output error` (o leitor de range dele não abriu o link). Fica para depois; o dono decide se comenta no PR. O app "Nuvio Legacy DTS Debug" (`space.nuvio.native.legacy.dtsdebug`) está instalado na C9 ao lado do normal.
+- **PR #259 (DTS no webOS)**: testado na C9 na branch `test/dts-259` (`/Volumes/ExternalSSD/nuvio-dts-259`). A C9 toca DTS sozinha (o caminho do PR nem liga). Nas duas vezes em que o PR entrou (Top Gun, AIOStreams 2160p), falhou: `Selected DTS track or video absent` (provável TrueHD, não DTS) e `Container open: Input/output error` (o leitor de range dele não abriu o link). Fica para depois; o dono decide se comenta no PR. O app "Nuvio Legacy DTS Debug" (`com.mikhael.nuvio.dtsdebug`) está instalado na C9 ao lado do normal.
 - Canários do host `.tpk` (`agente/i195*`, `agente/i203`, `canary/*`, `canario/*`), `webos3`, `feat/vidaa`, `feat/tizen4-coop`, `perf/trim-fileira` (duplicata do `tex_pressao_memoria`).
 
 ---
@@ -92,7 +92,7 @@ Fonte: [ISSUES-2.0.md](ISSUES-2.0.md). Só o que dá para fazer sem relator:
 |---|---|---|
 | Android TCL `192.168.1.128:5555` | Detalhe: Notas → topo e "logo cresce do nada" (`359b8000`) | Dono navega; `adb logcat` linhas `FPS=`, `[quadro]`, `[gpu-modos] ... tela=detalhe`. Antes: 37–41 FPS e `fill=4.7–4.9x` na volta. |
 | Android TCL | Spotlight acha títulos depois de mudar addons (`cdc000aa`) | Adicionar/remover addon e buscar o mesmo termo. |
-| LG C9 `192.168.1.32` | Build das mudanças de hoje (`tools/arm.sh --alto-cache`) | `ssh -o ProxyCommand=none root@192.168.1.32` (senha alpine); log em `/tmp/space.nuvio.native.legacy.log`; conferir `/proc/<pid>/exe`. |
+| LG C9 `192.168.1.32` | Build das mudanças de hoje (`tools/arm.sh --alto-cache`) | `ssh -o ProxyCommand=none root@192.168.1.32` (senha alpine); log em `/tmp/com.mikhael.nuvio.log`; conferir `/proc/<pid>/exe`. |
 | LG C9 | Descanso: vitrine parada, relógio troca de lugar com fade, sem hora na vitrine | Ajustes › Aparência › Tela de descanso 30 s. |
 | Samsung | Nada de hoje foi provado. Prioridade: #233/#254/#255 e árabe | Só o dono/relatores têm Samsung. |
 

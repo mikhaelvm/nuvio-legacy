@@ -94,6 +94,8 @@ int  prog_tocou(const char *imdb);
 // mais novo vence; empate mantem o local. `r->perfil` e ignorado — vale o
 // perfil ativo. Devolve 1 quando aplicou (o chamador entao atualiza o catalogo).
 int  prog_aplicar_remoto(const ProgRegistro *r);
+// One durable write; optional flags identify applied rows. Failure rolls back.
+int  prog_aplicar_remotos(const ProgRegistro *r, int n, unsigned char *aceitou);
 
 // Pendentes do perfil ativo, para o push. Devolve quantos.
 int  prog_pendentes(ProgRegistro *saida, int max);

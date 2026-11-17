@@ -15,6 +15,6 @@ Samsung fixes from the 1.3.8/1.3.9 logs: settings that reverted on the next star
 - Source add-ons no longer come up empty when a title is opened in the first seconds after launch (the search is repeated when the account's add-on list arrives).
 
 ## Packages
-- `space.nuvio.native.legacy_1.3.10_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.3.10_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.3.10_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.3.10_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.3.10-tizen.wgt` — Samsung Tizen (WASM).

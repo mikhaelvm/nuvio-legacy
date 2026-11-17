@@ -35,12 +35,16 @@ TMPDIR="${TMPDIR%/}"
 set -e
 cd "$(dirname "$0")/.." && source tools/ctr.sh
 
-TV_IP="${NUVIO_TV_IP:-192.168.1.32}"
+TV_IP="${NUVIO_TV_IP:-}"
 TV_PASS="${NUVIO_TV_PASS:-alpine}"
-APP_ID="space.nuvio.native.legacy"
-ARES="${NUVIO_ARES_PACKAGE:-../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package}"
+APP_ID=$(sed -n 's/^[[:space:]]*"id":[[:space:]]*"\([^"]*\)".*/\1/p' deploy/app/appinfo.json | head -1)
+ARES="${NUVIO_ARES_PACKAGE:-$PWD/build/webos-tools/node_modules/.bin/ares-package}"
 # Use ctr_run / ctr_build helpers instead (see tools/ctr.sh)
-BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/arm64}"
+case "$(uname -m)" in
+  x86_64|amd64) DEFAULT_BUILD_PLATFORM=linux/amd64 ;;
+  *) DEFAULT_BUILD_PLATFORM=linux/arm64 ;;
+esac
+BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-$DEFAULT_BUILD_PLATFORM}"
 SDK_IMAGE="${NUVIO_SDK_IMAGE:-nuvio-webos-sdk}"
 # DTS (PR #259): o FFmpeg mora na IMAGEM. Por padrao a build exige a
 # conversao e falha se o FFmpeg estiver ausente; reconstrua a imagem nesse caso.
@@ -88,11 +92,11 @@ RUST_VOL=()
 if [ "$RUST_MKVCORE" = 1 ]; then
   RUST_PERSONALITY=0
   if [ "${NUVIO_DV7:-1}" = 1 ] && [ "$DTS_ENABLED" = 1 ]; then RUST_PERSONALITY=1; fi
-  RUST_LIB=$(NUVIO_RUST_EXTERNAL_PERSONALITY="$RUST_PERSONALITY" CARGO_NET_OFFLINE=true bash tools/rust-mkvcore.sh armv7-unknown-linux-gnueabi)
+  RUST_LIB=$(NUVIO_RUST_EXTERNAL_PERSONALITY="$RUST_PERSONALITY" CARGO_NET_OFFLINE="${CARGO_NET_OFFLINE:-false}" bash tools/rust-mkvcore.sh armv7-unknown-linux-gnueabi)
   RUST_VOL=(-v "$RUST_LIB:/tmp/libmkvcore.a:ro")
   # The container has no cargo: build the DV7 converter here with the same toolchain.
   if [ "$RUST_PERSONALITY" = 1 ]; then
-    (export RUSTUP_HOME="${RUSTUP_HOME:-/Volumes/ExternalSSD/rust/rustup}" CARGO_HOME="${CARGO_HOME:-/Volumes/ExternalSSD/rust/cargo}"
+    (export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
      export PATH="$CARGO_HOME/bin:$PATH" NUVIO_DV7_TARGET=armv7-unknown-linux-gnueabi
      bash tools/build-dv7.sh >&2)
   fi
@@ -161,7 +165,6 @@ ctr_run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
   # -DNV_WEBOS: a identidade do alvo tem que vir daqui, porque o compilador
   # webos define __linux__ igual a qualquer Linux e a toolchain nao tem macro
   # propria (src/ajustes.c separa o locale da TV por ela, como NV_TPK e
-  # NV_ANDROID fazem nos outros alvos).
   P2P_CFLAGS=""
   P2P_LIBS=""
   if [ "${NUVIO_P2P_MOTOR:-}" = "1" ]; then
@@ -314,12 +317,10 @@ GLOB_DE_PESSOA="livetv-contas-p*.txt epg-conta-*.* m3u-p*.txt m3u-cache-p*.txt s
 #
 # collections/ sao 165 MB de quadros de animacao do catalogo CURADO do dono:
 # quem instalasse veria a colecao de outra pessoa como se fosse sua. Era
-# pendencia conhecida deste .ipk (tools/tizen-art.sh ja a recusa no .wgt e diz
 # isso por escrito) e sai agora.
 #
 # NAO E PERDA DE FUNCIONALIDADE: sem collections.json o app nao tem pasta LOCAL
 # nenhuma e as colecoes passam a vir so da CONTA, que e exatamente como o alvo
-# Tizen ja funciona. A arte editorial embarcada tambem so era usada por pastas
 # locais (col_definir_json reaproveita arte apenas do que tem `local`), e as
 # chaves dela sao os ids das colecoes DO DONO — para outra conta ela nunca
 # casaria.
@@ -451,6 +452,10 @@ if [ "$1" = "--ipk" ]; then
 fi
 
 if [ "$1" = "--build" ] || [ "$2" = "--build" ]; then exit 0; fi
+if [ -z "$TV_IP" ]; then
+  echo "Defina NUVIO_TV_IP para instalar na sua TV, ou use --build para apenas compilar." >&2
+  exit 2
+fi
 
 # A TV ESTA ROOTEADA: copia direta, sem passar pelo instalador.
 #
@@ -497,28 +502,10 @@ $SCP nuvio-proto.arm "root@$TV_IP:$APPDIR/nuvio-proto.novo"
 # mapeado e a escrita direta falha com ETXTBSY. O rename troca o inode.
 $SSH "root@$TV_IP" "cd $APPDIR && mv -f nuvio-proto.novo nuvio-proto && chmod 755 nuvio-proto"
 
-# A ARTE muda pouco, mas quando muda (icone novo, fonte) tem de ir junto.
-# CARIMBO DE BUILD NO TITULO.
-#
-# "ainda e build antiga" nao tem como ser respondido olhando a tela: o md5 do
-# binario prova o que esta no DISCO, nao o que foi LANCADO, e a TV tem dois apps
-# Nuvio (este e o web "Nuvio TV") — abrir o tile errado da exatamente o mesmo
-# sintoma. Com os 8 primeiros digitos do md5 no titulo, o launcher responde
-# sozinho qual build esta ali.
-echo "==> carimbando titulo com a build"
+# Preserve the requested launcher title; identify the binary in deployment logs.
 STAMP=$(md5 -q nuvio-proto.arm 2>/dev/null || md5sum nuvio-proto.arm | cut -d' ' -f1)
-STAMP=${STAMP:0:8}
-[ -n "$VARIANTE" ] && STAMP="$STAMP high cache"
-# CARIMBO POR ACRESCIMO, e nao por substituicao de "(BUILD)".
-#
-# O titulo do pacote publicado e so "Nuvio Legacy" — e o nome que a pessoa ve na TV, e
-# nele nao cabe nome de build. Mas a INSTALACAO DE DESENVOLVIMENTO precisa dizer
-# qual binario esta ali, entao o carimbo entra ao lado do nome so no caminho do
-# deploy por ssh: "Nuvio Legacy (08cd72a3)". O pacote de release nunca passa por aqui.
-#
-# A conferencia de verdade continua sendo /proc/<pid>/exe: o app manager cacheia
-# o appinfo ate reinstalar, e ja aconteceu de o titulo mostrar a build anterior.
-sed "s/\(\"title\": \"[^\"]*\)\"/\1 ($STAMP)\"/" deploy/app/appinfo.json > ${TMPDIR:-/tmp}/appinfo.stamped.json
+echo "==> Nuvio build ${STAMP:0:8}"
+cp deploy/app/appinfo.json ${TMPDIR:-/tmp}/appinfo.stamped.json
 cp ${TMPDIR:-/tmp}/appinfo.stamped.json deploy/app/appinfo.json.stamped
 
 $SCP ${TMPDIR:-/tmp}/appinfo.stamped.json "root@$TV_IP:$APPDIR/appinfo.json"
@@ -587,13 +574,14 @@ done
 # launch NAO reinicia um app que ja esta rodando: so o traz para frente (ver
 # FERRAMENTAS.md). Dois deploys desta tarde foram lidos no log de um processo
 # antigo por isso. Matar antes; o SAM relanca o binario novo.
-PID=$($SSH "root@$TV_IP" "pidof nuvio-proto" 2>/dev/null | tr -d "\r")
+APP_PIDS="for p in \$(pidof nuvio-proto); do x=\$(readlink /proc/\$p/exe); case \"\$x\" in \"$APPDIR/\"*) echo \$p;; esac; done"
+PID=$($SSH "root@$TV_IP" "$APP_PIDS" 2>/dev/null | tr -d "\r")
 if [ -n "$PID" ]; then
   echo "==> encerrando processo antigo ($PID)"
   $SSH "root@$TV_IP" "kill $PID"
   for _ in 1 2 3 4 5 6 7 8 9 10; do
     sleep 1
-    NPID=$($SSH "root@$TV_IP" "pidof nuvio-proto" 2>/dev/null | tr -d "\r")
+    NPID=$($SSH "root@$TV_IP" "$APP_PIDS" 2>/dev/null | tr -d "\r")
     [ -z "$NPID" ] && break
   done
   sleep 4

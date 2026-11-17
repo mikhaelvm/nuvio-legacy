@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#if defined(__EMSCRIPTEN__) || defined(_WIN32)
+#if defined(_WIN32)
 void queda_armar(const char *arquivo) { (void)arquivo; }
 void queda_armar_encadeado(const char *arquivo, void (*antes)(void)) { (void)arquivo; (void)antes; }
 int  queda_relatar(const char *arquivo) { (void)arquivo; return 0; }
@@ -16,8 +16,6 @@ int  queda_relatar_em(const char *arquivo, FILE *saida) { (void)arquivo; (void)s
 #include <fcntl.h>
 #if defined(__linux__)
 #include <ucontext.h>
-#elif defined(__APPLE__)
-#include <sys/ucontext.h>
 #endif
 
 #define QD_ALT_TAM   (64 * 1024)  // pilha alternativa: estouro de pilha tambem e SIGSEGV
@@ -42,16 +40,12 @@ static void qdCampo(int fd, const char *nome, uintptr_t v) { qdTexto(fd, nome); 
 // bits o codigo Thumb nao mantem cadeia de quadros confiavel.
 static void qdRegs(void *ctx, uintptr_t *pc, uintptr_t *lr, uintptr_t *sp, uintptr_t *fp) {
   *pc = *lr = *sp = *fp = 0;
-#if defined(__linux__) && defined(__arm__)
+#if (defined(__linux__)) && (defined(__arm__))
   { ucontext_t *u = ctx;
     *pc = u->uc_mcontext.arm_pc; *lr = u->uc_mcontext.arm_lr; *sp = u->uc_mcontext.arm_sp; }
-#elif defined(__linux__) && defined(__aarch64__)
+#elif (defined(__linux__)) && (defined(__aarch64__))
   { ucontext_t *u = ctx;
     *pc = u->uc_mcontext.pc; *lr = u->uc_mcontext.regs[30]; *sp = u->uc_mcontext.sp; *fp = u->uc_mcontext.regs[29]; }
-#elif defined(__APPLE__) && defined(__aarch64__)
-  { ucontext_t *u = ctx;   // so para o teste no Mac
-    *pc = (uintptr_t)u->uc_mcontext->__ss.__pc; *lr = (uintptr_t)u->uc_mcontext->__ss.__lr;
-    *sp = (uintptr_t)u->uc_mcontext->__ss.__sp; *fp = (uintptr_t)u->uc_mcontext->__ss.__fp; }
 #else
   (void)ctx;
 #endif

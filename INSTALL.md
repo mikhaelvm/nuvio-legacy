@@ -1,11 +1,11 @@
 # Installing on another TV
 
 Download the `.ipk` (**~47 MB**) from the
-[releases page](https://github.com/iqui27/nuvio-native-legacy/releases/latest),
+[releases page](https://github.com/mikhaelvm/nuvio-legacy/releases/latest),
 or build it yourself:
 
 ```bash
-bash tools/arm.sh --ipk
+bash tools/arm.sh --ipk --build
 ```
 
 The package contains **no credentials**. `tools/testa-ipk.sh` proves it, and
@@ -14,39 +14,6 @@ The package contains **no credentials**. `tools/testa-ipk.sh` proves it, and
 ---
 
 ---
-
-## Hisense VIDAA (Experimental)
-
-VIDAA apps are web-based, hosted at a URL. Nuvio is available at:
-
-**`https://nuvio-tv.henriquef29.workers.dev/tv/`**
-
-Two builds are available; the TV picks automatically:
-- **Multithreaded (mt)** — uses SharedArrayBuffer, faster if supported
-- **Single-threaded (st)** — fallback for older TVs
-
-### Option A: Bookmark (simplest)
-
-Open the TV browser and bookmark the URL above. No installation needed.
-
-### Option B: Sideload with Developer Mode
-
-For systems that require app to be in the official app list:
-
-```bash
-# Enable Developer Mode on TV: Settings > System > About > 1234
-# Then run the installer:
-sudo python3 tools/vidaa-instalar/instalar.py
-
-# Or with custom IP:
-sudo python3 tools/vidaa-instalar/instalar.py --ip 192.168.1.100
-```
-
-This creates a local DNS/HTTPS server that mimics vidaahub.com, allowing the TV
-to call `Hisense_installApp()`. After installation, change DNS back to automatic.
-
-See `tools/vidaa-instalar/README.md` for detailed instructions.
-
 
 ## Do you need root? No. But read the LS2 caveat.
 
@@ -68,8 +35,8 @@ little free RAM, so pick H.264 sources when you can.
 
 ```bash
 ares-setup-device
-ares-install space.nuvio.native.legacy_<version>_arm.ipk -d <name>
-ares-launch space.nuvio.native.legacy -d <name>
+ares-install com.mikhael.nuvio_<version>_arm.ipk -d <name>
+ares-launch com.mikhael.nuvio -d <name>
 ```
 
 `tools/arm.sh` is **not** the tool for this: it uses root over port 22 with a
@@ -140,5 +107,5 @@ here — this TV has no Developer Mode app installed and port 9922 is closed
   verifies the exclusion against the finished package, deleting it if one
   appears.
 - **50 h** sessions in Developer Mode. LG's limit, not the app's.
-- The package uses the id `space.nuvio.native.legacy` so it can coexist with the
+- The package uses the id `com.mikhael.nuvio` so it can coexist with the
   web app (`space.nuvio.webos`) on the same TV. See PORT-LEGACY.md.

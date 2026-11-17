@@ -1,13 +1,8 @@
-# Funcoes para achar o motor P2P ja compilado. Quem usa: tools/android.sh,
-# tools/arm.sh, tools/tpk.sh (e, por eles, release-android.sh/release-samsung.sh).
 #
 #   . tools/p2p-motor/pasta.sh
-#   nv_p2p_resolver android     # define NV_P2P_DIR (pasta da plataforma) ou ""
 #
 # A RAIZ tem uma subpasta por plataforma, cada uma montada pelo seu build-*.sh:
-#   <raiz>/android/{lib/<abi>/*.a, include/}      tools/p2p-motor/build-android.sh
 #   <raiz>/arm/{build-arm/..., nuvio-engine/include/}   build-arm.sh (LG webOS)
-#   <raiz>/tpk/{libnuvio_engine.so, include/}     build-tpk.sh (Tizen 6+)
 #   <raiz>/licenses/                              avisos que o motor exige
 #
 # QUAL RAIZ: $NUVIO_P2P_MOTOR; sem ela, ~/.nuvio-p2p-motor ou
@@ -31,20 +26,15 @@ nv_p2p_raiz() {
   return 0
 }
 
-nv_p2p_resolver() {  # $1 = android | arm | tpk
+nv_p2p_resolver() {  # $1 = arm
+  [ "$1" = arm ] || { echo "motor P2P: alvo invalido: $1" >&2; return 2; }
   nv_p2p_raiz
   NV_P2P_DIR=""
   [ -n "$NV_P2P_RAIZ" ] || { echo "  motor P2P: DESLIGADO (sem pasta; NUVIO_P2P_MOTOR=${NUVIO_P2P_MOTOR:-<vazio>})" >&2; return 0; }
   local d="$NV_P2P_RAIZ/$1" f falta=""
   case "$1" in
-    android) for f in arm64-v8a armeabi-v7a; do
-               for l in libnuvio_engine.a libtorrent-rasterbar.a libssl.a libcrypto.a; do
-                 [ -s "$d/lib/$f/$l" ] || falta="$falta lib/$f/$l"; done; done
-             [ -s "$d/include/nuvio_engine/nuvio_engine.h" ] || falta="$falta include/nuvio_engine/nuvio_engine.h" ;;
     arm)     for l in build-arm/libnuvio_engine.a build-arm/_deps/nuvio_libtorrent-build/libtorrent-rasterbar.a \
                       nuvio-engine/include/nuvio_engine/nuvio_engine.h; do
-               [ -s "$d/$l" ] || falta="$falta $l"; done ;;
-    tpk)     for l in libnuvio_engine.so include/nuvio_engine/nuvio_engine.h; do
                [ -s "$d/$l" ] || falta="$falta $l"; done ;;
   esac
   if [ -n "$falta" ]; then

@@ -533,13 +533,14 @@ static void marcarTentada(const char *imdb) {
 // nos primeiros 40 s, a lista inteira do "Continuar" refeita 3x): cada volta
 // pagava de novo uma ficha por titulo, ~12-20 GETs, para o texto e a duracao que
 // nao mudam em minutos. Guarda o corpo por (tipo, id, idioma) por 15 min, no
-// maximo 24 fichas e so as de ate 256 KB (o videos[] de serie longa e grande).
+// maximo 64 fichas, com teto conjunto de 6 MiB e so as de ate 256 KB (o videos[] de serie longa e grande).
 // Falha nunca e guardada: o proximo ciclo tenta a rede de novo.
-#define TK_FICHA_MAX 24
+#define TK_FICHA_MAX 64
+#define TK_FICHA_TOTAL (6 * 1024 * 1024)
 #define TK_FICHA_TTL_S 900
 #define TK_FICHA_BYTES (256 * 1024)
-static struct { char chave[64]; char *corpo; time_t quando; } fichas[TK_FICHA_MAX];
-static int fichaProx;
+static struct { char chave[64]; char *corpo; time_t quando; unsigned long uso; } fichas[TK_FICHA_MAX];
+static unsigned long fichaUso;
 static pthread_mutex_t fichaTrava = PTHREAD_MUTEX_INITIALIZER;
 
 static char *fichaChave(char *k, size_t n, const char *tipo, const char *id) {
@@ -554,7 +555,7 @@ static char *fichaBuscar(const char *tipo, const char *id) {
   for (i = 0; i < TK_FICHA_MAX && !r; i++)
     if (fichas[i].corpo && !strcmp(fichas[i].chave, k) &&
         time(NULL) - fichas[i].quando < TK_FICHA_TTL_S)
-      r = strdup(fichas[i].corpo);
+      { r = strdup(fichas[i].corpo); fichas[i].uso = ++fichaUso; }
   pthread_mutex_unlock(&fichaTrava);
   return r;
 }
@@ -568,10 +569,26 @@ static void fichaGuardar(const char *tipo, const char *id, const char *corpo) {
   pthread_mutex_lock(&fichaTrava);
   for (i = 0; i < TK_FICHA_MAX; i++)
     if (fichas[i].corpo && !strcmp(fichas[i].chave, k)) break;
-  if (i == TK_FICHA_MAX) { i = fichaProx; fichaProx = (fichaProx + 1) % TK_FICHA_MAX; }
+  if (i == TK_FICHA_MAX) {
+    i = 0;
+    for (int q = 1; q < TK_FICHA_MAX; q++)
+      if (fichas[q].uso < fichas[i].uso) i = q;
+  }
+  size_t bytes = strlen(c) + 1;
+  for (int q = 0; q < TK_FICHA_MAX; q++)
+    if (q != i && fichas[q].corpo) bytes += strlen(fichas[q].corpo) + 1;
+  while (bytes > TK_FICHA_TOTAL) {
+    int velho = -1;
+    for (int q = 0; q < TK_FICHA_MAX; q++)
+      if (q != i && fichas[q].corpo &&
+          (velho < 0 || fichas[q].uso < fichas[velho].uso)) velho = q;
+    if (velho < 0) break;
+    bytes -= strlen(fichas[velho].corpo) + 1;
+    free(fichas[velho].corpo); memset(&fichas[velho], 0, sizeof fichas[velho]);
+  }
   free(fichas[i].corpo);
   snprintf(fichas[i].chave, sizeof fichas[i].chave, "%s", k);
-  fichas[i].corpo = c; fichas[i].quando = time(NULL);
+  fichas[i].corpo = c; fichas[i].quando = time(NULL); fichas[i].uso = ++fichaUso;
   pthread_mutex_unlock(&fichaTrava);
 }
 
@@ -624,9 +641,16 @@ static char *cinemetaDaSerie(const char *tipo, const char *serie) {
   MetaprovCineResult result;
   char *c = fichaBuscar("cinemeta-series", serie);
   if (c) return c;
+  char dk[64];
+  fichaChave(dk, sizeof dk, "cinemeta-series", serie);
+  c = fichameta_ler(dk, 15 * 60);
+  if (c) { fichaGuardar("cinemeta-series", serie, c); return c; }
   if (cineNegSabe(serie)) return NULL;   // ja nao tinha: nao pergunta de novo
   c = metaprov_meta_cinemeta_com(tipo, serie, 8, NULL, NULL, &result);
-  if (result == METAPROV_CINE_FOUND) fichaGuardar("cinemeta-series", serie, c);
+  if (result == METAPROV_CINE_FOUND) {
+    fichaGuardar("cinemeta-series", serie, c);
+    fichameta_gravar(dk, c);
+  }
   else if (result == METAPROV_CINE_ABSENT) cineNegMarcar(serie);
   return c;
 }

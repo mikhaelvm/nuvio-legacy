@@ -17,7 +17,13 @@ static const char streams[] = "{\"streams\":[{\"url\":\"https://fixture.invalid/
 static int calls;
 static char expected[512];
 char *rede_baixar(const char *url, int seconds) {
-  assert(seconds == (strstr(expected, "/stream/tv/") ? 12 : 30));
+  if (strstr(url,"/manifest.json")) {
+    if (strstr(url,"unrelated.invalid")) return strdup("{\"resources\":[{\"name\":\"stream\",\"idPrefixes\":[\"tt\"]}]}");
+    return strdup(manifest);
+  }
+  // Timeout is selected by the current TV/addon profile, not ID encoding.
+    assert(seconds > 0 && seconds <= 30);
+  if (strcmp(url,expected)) fprintf(stderr,"fixture request mismatch: %s != %s\n",url,expected);
   assert(!strcmp(url, expected));
   calls++;
   return strdup(streams);

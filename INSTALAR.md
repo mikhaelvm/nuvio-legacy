@@ -3,10 +3,10 @@
 O pacote sai de:
 
 ```bash
-bash tools/arm.sh --ipk
+bash tools/arm.sh --ipk --build
 ```
 
-`space.nuvio.native.legacy_<versao>_arm.ipk`, **~47 MB**, sem credencial nenhuma
+`com.mikhael.nuvio_<versao>_arm.ipk`, **~47 MB**, sem credencial nenhuma
 dentro — `tools/testa-ipk.sh` prova isso, e o proprio `arm.sh` aborta e apaga o
 pacote se alguma voltar.
 
@@ -14,38 +14,6 @@ pacote se alguma voltar.
 
 
 ---
-
-## Hisense VIDAA (Experimental)
-
-Apps em VIDAA sao hospedadas numa URL, nao sao pacotes de sistema. O Nuvio esta em:
-
-**`https://nuvio-tv.henriquef29.workers.dev/tv/`**
-
-Dois builds disponiveis; a TV escolhe automaticamente:
-- **Multifio (mt)** — usa SharedArrayBuffer, mais rapido se suportado
-- **Um fio (st)** — fallback para TVs antigas
-
-### Opcao A: Bookmark (mais simples)
-
-Abre o navegador da TV e coloca essa URL nos favoritos. Nao precisa de nada.
-
-### Opcao B: Sideload com Developer Mode
-
-Para sistemas que exigem o app estar na lista oficial:
-
-```bash
-# Ativa Developer Mode na TV: Configuracoes > Sistema > Sobre > 1234
-# Depois roda o instalador:
-sudo python3 tools/vidaa-instalar/instalar.py
-
-# Ou com IP customizado:
-sudo python3 tools/vidaa-instalar/instalar.py --ip 192.168.1.100
-```
-
-Cria um servidor DNS/HTTPS local que se passa por vidaahub.com, permitindo que a TV
-chame `Hisense_installApp()`. Depois de instalar, volta o DNS para automatico.
-
-Ver `tools/vidaa-instalar/README.md` para instrucoes detalhadas.
 
 ## Precisa de root? Nao. Mas leia a ressalva do LS2.
 
@@ -71,8 +39,8 @@ segura.
 
 ```bash
 ares-setup-device                 # cadastra IP e chave do Dev Mode
-ares-install space.nuvio.native.legacy_<versao>_arm.ipk -d <nome>
-ares-launch space.nuvio.native.legacy -d <nome>
+ares-install com.mikhael.nuvio_<versao>_arm.ipk -d <nome>
+ares-launch com.mikhael.nuvio -d <nome>
 ```
 
 O `tools/arm.sh` **nao serve** aqui: ele usa root na porta 22 com senha, e o
@@ -139,5 +107,5 @@ esta fechada (conferido).
   o catalogo dele antes de logar. Hoje o `arm.sh` exclui todo arquivo pessoal e
   CONFERE a exclusao no pacote pronto, apagando-o se algum aparecer.
 - **50h** no Developer Mode. Limite da LG, nao do app.
-- O pacote usa o id `space.nuvio.native.legacy` para conviver com o app web
+- O pacote usa o id `com.mikhael.nuvio` para conviver com o app web
   (`space.nuvio.webos`) na mesma TV. Ver PORT-LEGACY.md.

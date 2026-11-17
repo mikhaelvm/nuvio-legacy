@@ -32,9 +32,8 @@ deploy/app/art/collections/
 POST-REDDIT.md
 .claude/
 
-# Saida do alvo Tizen (WASM). Regenerada por tools/tizen.sh.
+# Saida da compilacao webOS e verificacoes locais.
 build/
-*.wgt
 
 # Fotos da tela da TV, tiradas para ler o painel de diagnostico.
 *.heic

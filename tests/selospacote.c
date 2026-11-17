@@ -207,6 +207,29 @@ int main(void) {
     r = regexjs_compilar_web("^b$", e, sizeof e);
     assert(r && !regexjs_testar(r, "a\nb\nc", 5)); regexjs_liberar(r);
   }
+  // Native account badges follow active account imports, independent of
+  // the TV's legacy embedded/local-pack selection.
+  {
+    reiniciarPerfil(23);
+    selospacote_conta_do_blob("{\"features\": {\"stream_badge_settings\": {\"stream_badge_rules\": \"{\\\"imports\\\": [{\\\"sourceUrl\\\": \\\"account-a\\\", \\\"isActive\\\": true, \\\"filters\\\": [{\\\"name\\\": \\\"HDR da conta\\\", \\\"pattern\\\": \\\"HDR\\\", \\\"imageURL\\\": \\\"https://badge.invalid/hdr.png\\\"}]}, {\\\"sourceUrl\\\": \\\"account-b\\\", \\\"isActive\\\": true, \\\"filters\\\": [{\\\"name\\\": \\\"4K da conta\\\", \\\"pattern\\\": \\\"2160\\\", \\\"imageURL\\\": \\\"https://badge.invalid/4k.png\\\"}, {\\\"name\\\": \\\"HDR duplicado\\\", \\\"pattern\\\": \\\"HDR\\\", \\\"imageURL\\\": \\\"https://badge.invalid/hdr.png\\\"}]}, {\\\"sourceUrl\\\": \\\"inactive\\\", \\\"isActive\\\": false, \\\"filters\\\": [{\\\"name\\\": \\\"Nunca\\\", \\\"pattern\\\": \\\".*\\\", \\\"imageURL\\\": \\\"https://badge.invalid/off.png\\\"}]}]}\", \"show_file_size_badges\": false, \"stream_badge_placement\": \"TOP\"}}}");
+    selospacote_escolher(-1);
+    assert(selospacote_conta_tem());
+    assert(!selospacote_conta_tamanho() && selospacote_conta_em_cima());
+    const char *campos[] = {"2160p HDR"}; unsigned short ids[16];
+    int count = selospacote_casar_conta(campos,1,ids,16);
+    assert(count == 2);
+    assert(!strcmp(selospacote_filtro(ids[0])->nome,"HDR da conta"));
+    assert(!strcmp(selospacote_filtro(ids[1])->nome,"4K da conta"));
+    unsigned v = selospacote_versao();
+    selospacote_conta_do_blob("{\"features\": {\"stream_badge_settings\": {\"stream_badge_rules\": \"{\\\"imports\\\": [{\\\"sourceUrl\\\": \\\"account-a\\\", \\\"isActive\\\": true, \\\"filters\\\": [{\\\"name\\\": \\\"HDR da conta\\\", \\\"pattern\\\": \\\"HDR\\\", \\\"imageURL\\\": \\\"https://badge.invalid/hdr.png\\\"}]}, {\\\"sourceUrl\\\": \\\"account-b\\\", \\\"isActive\\\": true, \\\"filters\\\": [{\\\"name\\\": \\\"4K da conta\\\", \\\"pattern\\\": \\\"2160\\\", \\\"imageURL\\\": \\\"https://badge.invalid/4k.png\\\"}, {\\\"name\\\": \\\"HDR duplicado\\\", \\\"pattern\\\": \\\"HDR\\\", \\\"imageURL\\\": \\\"https://badge.invalid/hdr.png\\\"}]}, {\\\"sourceUrl\\\": \\\"inactive\\\", \\\"isActive\\\": false, \\\"filters\\\": [{\\\"name\\\": \\\"Nunca\\\", \\\"pattern\\\": \\\".*\\\", \\\"imageURL\\\": \\\"https://badge.invalid/off.png\\\"}]}]}\", \"show_file_size_badges\": false, \"stream_badge_placement\": \"TOP\"}}}"); assert(v == selospacote_versao());
+    reiniciarPerfil(24); assert(!selospacote_conta_tem());
+    assert(selospacote_conta_tamanho() && !selospacote_conta_em_cima());
+    reiniciarPerfil(23); assert(selospacote_conta_tem());
+    assert(!selospacote_conta_tamanho() && selospacote_conta_em_cima());
+    selospacote_conta_do_blob("{\"features\":{\"stream_badge_settings\":{\"stream_badge_rules\":\"\"}}}");
+    assert(!selospacote_conta_tem());
+    puts("PASS account badges: modern JSON, active imports, dedupe, local override isolation, placement/size, persistence and removal");
+  }
   printf("selospacote: ok\n");
   return 0;
 }

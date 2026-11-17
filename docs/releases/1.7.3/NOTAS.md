@@ -26,8 +26,8 @@ New subtitle/audio sync and personal media servers remain planned for 1.8.
 
 | TV | System | File |
 | --- | --- | --- |
-| LG 2016 and newer | webOS 3 or newer | `space.nuvio.native.legacy_1.7.3_arm.ipk` |
-| LG with 2 GB of RAM or more | webOS 3 or newer | `space.nuvio.native.legacy_1.7.3_arm-highcache.ipk` |
+| LG 2016 and newer | webOS 3 or newer | `com.mikhael.nuvio_1.7.3_arm.ipk` |
+| LG with 2 GB of RAM or more | webOS 3 or newer | `com.mikhael.nuvio_1.7.3_arm-highcache.ipk` |
 | Samsung 2018–2020 | Tizen 4.0 / 5.0 / 5.5 | `Nuvio-1.7.3-NuvioTpk40.tpk` |
 | Samsung 2021 | Tizen 6.0 | `Nuvio-1.7.3-NuvioTpk60.tpk` |
 | Samsung 2022–2023 | Tizen 6.5 / 7.0 | `Nuvio-1.7.3-NuvioTpk65.tpk` |

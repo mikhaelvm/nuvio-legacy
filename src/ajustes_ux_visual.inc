@@ -42,11 +42,10 @@ static const char *ajVisualIcone(int op) {
     case AJ_RAIL: return "aj_panel-left";
     case AJ_MENU_TOPO: return "aj_panel-top";
     case AJ_ABAS_ESTILO: return "aj_panel-top";
-    case AJ_TECLADO_ANDROID: return "aj_keyboard";
+    case AJ_TECLADO_MODO: return "aj_keyboard";
     case AJ_FALHA_PROVEDORES: case AJ_FALHA_PROVEDOR_ORDEM: case AJ_FALHA_RD_LIMITE:
     case AJ_FALHA_TB_LIMITE: case AJ_FALHA_PM_LIMITE: case AJ_FALHA_AD_LIMITE:
     case AJ_FALHA_ADDONS: case AJ_FALHA_ADDON_ORDEM: case AJ_FALHA_ADDON_LIMITE: return "aj_plug";
-    case AJ_MENU_EXPLORAR: return "aj_panel-left";
     case AJ_MENU_GUIA: return "aj_panel-left";
     case AJ_MENU_AGENDA: return "aj_panel-left";
     case AJ_MENU_PERFIL: return "aj_panel-left";
@@ -86,7 +85,7 @@ static const char *ajVisualIcone(int op) {
     case AJ_HERO_TRAILER: return "aj_clapperboard";
     case AJ_FOCO_TRAILER: return "aj_clapperboard";
     case AJ_DET_TRAILER_AUTO: return "aj_clapperboard";
-    case AJ_TRAILER_ZOOM_TPK: return "aj_clapperboard";
+    case AJ_RESERVADO_ZOOM: return "aj_clapperboard";
     case AJ_DET_TRAILER: return "aj_clapperboard";
     case AJ_HERO_TRAILER_SOM: return "aj_audio-lines";
     case AJ_DET_TRAILER_SOM: return "aj_audio-lines";
@@ -142,7 +141,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_FONTE_IDIOMA_AUDIO: return "aj_audio-lines";
     case AJ_FILTROS_FONTES: return "aj_funnel";
     case AJ_PROVEDORES_ESCOPO: return "aj_key-round";
-    case AJ_AMIGOS_ESTILO: return "aj_users";
     case AJ_TITULO_FIL: return "aj_type";
     case AJ_MURAL_TITULOS: return "aj_images";
     case AJ_FONTE_GRUPO: return "aj_layers";
@@ -186,7 +184,6 @@ static const char *ajVisualIcone(int op) {
     case AJ_HERO_SINOPSE_TAM: case AJ_HERO_TAMANHO: case AJ_HERO_PASTA_DETALHES: return "aj_layout-dashboard";
     case AJ_ESTAT_TAMANHO: return "aj_gauge";
     case AJ_ESTAT_LADO: return "aj_gauge";
-    case AJ_REACAO_CREDITOS: return "aj_circle-play";
     case AJ_CW_CONCLUIDO: return "aj_circle-play";
     case AJ_CW_MINIMO: return "aj_circle-play";
     case AJ_PULAR_ABERTURA: case AJ_PULAR_RESUMO: case AJ_PULAR_CREDITOS: case AJ_PROXIMO_AUTO: case AJ_PROXIMO_CONTAGEM: return "aj_circle-play";

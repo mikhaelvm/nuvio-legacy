@@ -30,7 +30,7 @@ semProva=0
 for f in tests/*.sh; do
   n=$(basename "$f")
   case "$n" in
-    *_shot.sh|cinematic.sh|director.sh|webp-tizen.sh|webp-vidaa-st.sh|tizen-clock.sh|salvospainel_perf.sh|fluidez_perf_player.sh|fluidez_perf_guia.sh) pulados=$((pulados + 1)); continue;;
+    *_shot.sh|cinematic.sh|director.sh|salvospainel_perf.sh|fluidez_perf_player.sh|fluidez_perf_guia.sh) pulados=$((pulados + 1)); continue;;
   esac
   if timeout -k 5 "${TEST_TIMEOUT:-120}" bash "$f" >"$LOGS/$n.log" 2>&1; then
     # SKIP (ex.: p2pmotor_real.sh sem o motor compilado) sai com 0 mas NAO

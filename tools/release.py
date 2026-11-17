@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""Release local: tres toolchains, stdlib, nenhum publish/deploy implicito."""
+"""Release local webOS: dois pacotes IPK, sem publish/deploy implicito."""
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
 import json
@@ -13,8 +12,6 @@ import sys
 import tarfile
 import tempfile
 import time
-import xml.etree.ElementTree as ET
-import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -68,28 +65,9 @@ def config():
         return dict(line.split('=', 1) for line in path.read_text().splitlines())
 
 
-def prepare_ass():
-    target = Path(os.environ.get('NUVIO_ASS_ROOT', 'build/ass-wasm'))
-    needed = ['include/ass/ass.h', 'lib/libass.a', 'lib/libharfbuzz.a', 'lib/libfribidi.a', 'lib/libfreetype.a']
-    if all((target / name).is_file() for name in needed):
-        return
-    if 'NUVIO_ASS_ROOT' not in os.environ and not target.exists() and not target.is_symlink():
-        for line in command('git', 'worktree', 'list', '--porcelain').splitlines():
-            if line.startswith('worktree '):
-                other = Path(line[9:]) / 'build/ass-wasm'
-                if all((other / name).is_file() for name in needed):
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.symlink_to(other.resolve(), target_is_directory=True)
-                    print(f'[preflight] ass-wasm reutilizado: {other.resolve()}', flush=True)
-                    return
-    raise RuntimeError('libass WASM incompleta; rode tools/build-ass-wasm.sh ou configure NUVIO_ASS_ROOT')
-
-
 def expected_files(version):
-    return [f'space.nuvio.native.legacy_{version}_arm{suffix}.ipk' for suffix in ('', '-highcache')] + [
-        f'Nuvio-{version}-android.apk', f'Nuvio-{version}-android-lite-armv7.apk', f'Nuvio-{version}-android-lite-arm64.apk', f'NuvioTV-{version}-tizen.wgt',
-        *[f'Nuvio-{version}-{p}.tpk' for p in ('NuvioTpk40', 'NuvioTpk60', 'NuvioTpk65', 'NuvioTpk')],
-        f'libnuvio-{version}-tpk-arm.so', f'libnuvio-{version}-tpk40-arm.so']
+    app_id = json.loads((ROOT / 'deploy/app/appinfo.json').read_text(encoding='utf-8'))['id']
+    return [f'{app_id}_{version}_arm{suffix}.ipk' for suffix in ('', '-highcache')]
 
 
 def verify_packages(out, version, values):
@@ -104,33 +82,13 @@ def verify_packages(out, version, values):
         if not path.is_file() or not path.stat().st_size:
             raise RuntimeError(f'faltou {name}')
         binaries = {}
-        if path.suffix == '.ipk':
-            payload = subprocess.check_output(['ar', 'p', str(path), 'data.tar.gz'])
-            with tarfile.open(fileobj=io.BytesIO(payload), mode='r:gz') as tf:
-                app = next(m for m in tf.getmembers() if m.name.endswith('/appinfo.json'))
-                if json.load(tf.extractfile(app))['version'] != version:
-                    raise RuntimeError(f'{name}: versao do appinfo diverge')
-                exe = next(m for m in tf.getmembers() if m.name.endswith('/nuvio-proto'))
-                binaries['nuvio-proto'] = check_binary(tf.extractfile(exe).read(), name)
-        elif path.suffix == '.so':
-            binaries[name] = check_binary(path.read_bytes(), name)
-        else:
-            with zipfile.ZipFile(path) as z:
-                if path.suffix == '.apk':
-                    # release-android.sh ja confere versionName, certificado e bibliotecas.
-                    abis = ('arm64-v8a', 'armeabi-v7a')
-                    if name.endswith('-lite-armv7.apk'):
-                        abis = ('armeabi-v7a',)
-                    elif name.endswith('-lite-arm64.apk'):
-                        abis = ('arm64-v8a',)
-                    targets = [f'lib/{abi}/libmain.so' for abi in abis]
-                else:
-                    manifest = 'config.xml' if path.suffix == '.wgt' else 'tizen-manifest.xml'
-                    if ET.fromstring(z.read(manifest)).get('version') != version:
-                        raise RuntimeError(f'{name}: versao do manifesto diverge')
-                    targets = ['index.wasm'] if path.suffix == '.wgt' else ['lib/libnuvio.so']
-                for member in targets:
-                    binaries[member] = check_binary(z.read(member), f'{name}/{member}')
+        payload = subprocess.check_output(['ar', 'p', str(path), 'data.tar.gz'])
+        with tarfile.open(fileobj=io.BytesIO(payload), mode='r:gz') as tf:
+            app = next(m for m in tf.getmembers() if m.name.endswith('/appinfo.json'))
+            if json.load(tf.extractfile(app))['version'] != version:
+                raise RuntimeError(f'{name}: versao do appinfo diverge')
+            exe = next(m for m in tf.getmembers() if m.name.endswith('/nuvio-proto'))
+            binaries['nuvio-proto'] = check_binary(tf.extractfile(exe).read(), name)
         report[name] = {'bytes': path.stat().st_size, 'sha256': digest(path), 'binaries': binaries}
     return report
 
@@ -139,7 +97,6 @@ def main():
     os.chdir(ROOT)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('version', nargs='?')
-    parser.add_argument('--jobs', type=int, choices=(1, 2, 3), default=3, help='plataformas simultaneas (padrao: 3)')
     parser.add_argument('--ensaio', action='store_true', help='medir WIP sem commit; registra arvore suja e exige conteudo inalterado')
     parser.add_argument('--instalar', action='store_true', help='depois da conferencia, instalar variante LG normal via arm.sh')
     parser.add_argument('--check-tree', action='store_true', help=argparse.SUPPRESS)
@@ -161,7 +118,6 @@ def main():
     values = config()
     if values['NV_VERSAO'] != args.version:
         raise RuntimeError(f'versao solicitada {args.version} != fontes {values["NV_VERSAO"]}')
-    prepare_ass()
     out = ROOT / f'build/release-{args.version}'
     out.mkdir(parents=True, exist_ok=True)
     lock = ROOT / 'build/.release-lock'
@@ -197,18 +153,7 @@ def main():
         # Um manifesto anterior nao pode atestar uma rodada que falhou.
         for name in ['SHA256SUMS', 'repo.json', 'webosbrew.manifest.json', 'verification.json']:
             (out / name).unlink(missing_ok=True)
-        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-            futures = [pool.submit(lg),
-                       pool.submit(step, 'android', ['bash', 'tools/release-android.sh']),
-                       pool.submit(step, 'samsung', ['bash', 'tools/release-samsung.sh'])]
-            errors = []
-            for future in futures:
-                try:
-                    future.result()
-                except Exception as error:
-                    errors.append(str(error))
-        if errors:
-            raise RuntimeError('; '.join(errors))
+        lg()
         if tree_state()[1] != fingerprint:
             raise RuntimeError('arvore mudou durante o build')
         if config() != values:
@@ -224,9 +169,9 @@ def main():
         (out / 'verification.json').write_text(json.dumps({'version': args.version, 'commit': command('git', 'rev-parse', 'HEAD'),
             'tree': fingerprint, 'dirty': bool(status), 'ensaio': args.ensaio, 'packages': report}, indent=2)+'\n')
         rc = 0
-        print(f'Conferidos 10 artefatos + 2 JSON: {out}. Sem publicar.', flush=True)
+        print(f'Conferidos 2 pacotes IPK + 2 JSON: {out}. Sem publicar.', flush=True)
     finally:
-        timings['total'] = {'seconds': round(time.monotonic()-started, 2), 'rc': rc, 'jobs': args.jobs}
+        timings['total'] = {'seconds': round(time.monotonic()-started, 2), 'rc': rc}
         (logs / 'timings.json').write_text(json.dumps(timings, indent=2)+'\n')
         lock.rmdir()
     if args.instalar:

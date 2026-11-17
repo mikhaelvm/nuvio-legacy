@@ -9,27 +9,10 @@
 #include "dts/dts_pipeline.h"
 #endif
 #include <SDL2/SDL.h>
-#include "tpkteclas.h"
 #include "central.h"
 #include "sdlcompat.h"
 #include <SDL2/SDL_image.h>
 #include "gl_compat.h"
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/heap.h>
-#include <emscripten/html5.h>
-#include <malloc.h>
-#endif
-// Alvos SEM webOS. O Mac ja pulava estes trechos por um ifndef __APPLE__;
-// o alvo Tizen (WASM) precisa pular exatamente os mesmos. Nomear a condicao
-// evita ter de lembrar de dois simbolos em cada ponto - sem isto o primeiro
-// build para o navegador ainda tentava abrir libwayland-client.so.0.
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP) || defined(__EMSCRIPTEN__) || defined(NV_TPK) || defined(NV_ANDROID)
-#define NV_SEM_WEBOS 1
-#endif
-#ifdef NV_ANDROID
-#include "android.h"
-#endif
 #include <stdio.h>
 #include <locale.h>
 #include <stdlib.h>
@@ -38,10 +21,8 @@
 // SIGTERM tratado pelo app: webOS e desktop (Mac/Linux). No .tpk o host .NET e
 // dono do sinal, no Android o sistema mata sem SIGTERM util e no Tizen/WASM nao
 // ha sinal. Os desktops entram para o handler ser exercitavel por teste no Mac.
-#if !defined(__EMSCRIPTEN__) && !defined(NV_TPK) && !defined(NV_ANDROID)
 #define NV_SINAL_TERMINAR 1
 #include <signal.h>
-#endif
 #include <unistd.h>   // dup2 (o stderr no mesmo descritor do log)
 #include "gfx.h"
 #include "fundo.h"
@@ -57,7 +38,6 @@
 #include "marco.h"
 #include "memlog.h"
 #include "rede.h"
-#include "fio1.h"   // so existe corpo com NV_UM_FIO — ver o gancho perto de nv_ceder_quadro
 #include "tex_cache.h"
 #include "webp.h"
 #include "cachearte.h"
@@ -70,16 +50,12 @@
 #include "text.h"
 #include "detail.h"
 #include "dados.h"
-#include "androidcache.h"
 #include "negcache.h"
 #include "p2pmotor.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <time.h>
 #include "nuvem.h"
-#ifdef NV_ANDROID
-#include <sys/system_properties.h>
-#endif
 #include "sessao.h"
 #include "perfis.h"
 #include "sync.h"
@@ -133,10 +109,6 @@ static void perfTvFrame(Uint32 now, double ms) {
   if (now - checked >= 1000u) {
     char path[1024];
     int enabled = dados_caminho(path, sizeof path, "perf-tv") && access(path, F_OK) == 0;
-#ifdef NV_ANDROID
-    char value[PROP_VALUE_MAX];
-    enabled |= __system_property_get("debug.nuvio.perf", value) > 0 && !strcmp(value, "1");
-#endif
     if (!enabled && perftv_enabled && perftv_flush(&perfTv, line, sizeof line)) {
       puts(line); fflush(stdout);
     }
@@ -174,10 +146,8 @@ static void aoMudarIdiomaAuto(const char *codigo, int fonte, int notificar) {
         : i18n("Idioma definido pela sua conta · mudar em Ajustes"));
 }
 
-#ifndef NV_SEM_WEBOS
 #include <dlfcn.h>
 #include <SDL2/SDL_syswm.h>
-#endif
 
 #ifdef NV_SINAL_TERMINAR
 // SIGTERM (deploy, `kill`, o SAM fechando o app) PRECISA PASSAR PELA SAIDA
@@ -226,21 +196,12 @@ static void aoSinalTerminar(int sig) {
 // processo ocupa de verdade na TV (a LG tem 2,2 GB e 860 MB livres). Zero
 // onde nao ha /proc (Emscripten tem o [mem] proprio).
 static double rssMB(void) {
-#ifdef __EMSCRIPTEN__
-  return 0.0;
-#else
   FILE *f = fopen("/proc/self/statm", "r");
   long paginas = 0, res = 0;
   if (!f) return 0.0;
   if (fscanf(f, "%ld %ld", &paginas, &res) != 2) res = 0;
   fclose(f);
-#if defined(NV_ANDROID) && defined(NV_TOUCH_UI)
-  long tamanhoPagina = sysconf(_SC_PAGESIZE);
-  return tamanhoPagina > 0 ? (double)res * tamanhoPagina / 1048576.0 : 0.0;
-#else
   return (double)res * 4096.0 / 1048576.0;
-#endif
-#endif
 }
 
 // Captura de tela sob demanda. O framebuffer da TV nao pode ser lido nem como
@@ -257,62 +218,7 @@ static double rssMB(void) {
 // SDL3 por baixo) zera no SDL_PushEvent o scancode 489 da AZUL (medido: 489
 // entra, 0 sai). No .tpk o SDL e o 2.30.9 de verdade e nao mexe nele.
 static void remapCanal(SDL_Event *e) {
-#if defined(NV_ANDROID) || defined(NV_TPK) || defined(__APPLE__)
-  // (Samsung .tpk: tpkteclas.c entrega XF86RaiseChannel/LowerChannel como F7/F8.
-  // No Mac vale tambem, com o comportamento da Samsung: e o simulador dela.)
-  // CH+/CH- NO ANDROID. O NuvioActivity entrega CH+ como F7 e CH- como F8.
-  // Com canal na tela (guia, canal ao vivo, canal no canto) sao CH+/CH- de
-  // verdade, com os scancodes do webOS que guia.c, player.c e app.c ja
-  // tratam. Fora disso fazem o papel das teclas que o controle Android nao
-  // tem: CH+ = AZUL (Salvos), CH- = Spotlight (F5, SPOT_TECLA_ABRIR). O
-  // registro foi para a tecla Info (NuvioActivity: KEYCODE_INFO -> F9).
-  if ((e->type == SDL_KEYDOWN || e->type == SDL_KEYUP) &&
-      (e->key.keysym.sym == SDLK_F7 || e->key.keysym.sym == SDLK_F8)) {
-    int sobe = e->key.keysym.sym == SDLK_F7;
-    if (app_zap_ativo()) {
-      e->key.keysym.scancode = (SDL_Scancode)(sobe ? NV_SCANCODE_CH_UP : NV_SCANCODE_CH_DOWN);
-      e->key.keysym.sym = sobe ? SDLK_PAGEUP : SDLK_PAGEDOWN;
-    } else {
-      // CH+ e uma tecla de controle, nao a letra "s": preserva a identidade
-      // da AZUL tambem com campo de texto ativo e no Spotlight.
-      e->key.keysym.scancode = sobe ? (SDL_Scancode)NV_SCANCODE_BLUE : SDL_SCANCODE_F5;
-      e->key.keysym.sym = sobe ? SDLK_s : SDLK_F5;
-    }
-  }
-#elif defined(__EMSCRIPTEN__)
-  // .wgt: tizen-shell.html entrega o CH+ (427) como F7, com keydown e keyup,
-  // para a Central de controle saber quanto ele ficou embaixo, e o CH- (428)
-  // como F8. O CH+ NUNCA e zap aqui: a casca nao traduz a ColorF3Blue (406),
-  // entao o F7 e a unica "AZUL" do Tizen web (Guia completo na faixa do guia,
-  // Tela cheia no PiP, categoria seguinte no guia cheio). O CH- e zap com
-  // canal na tela e F5 (Spotlight) fora dela, como no .tpk.
-  if ((e->type == SDL_KEYDOWN || e->type == SDL_KEYUP) &&
-      (e->key.keysym.sym == SDLK_F7 || e->key.keysym.sym == SDLK_F8)) {
-    int sobe = e->key.keysym.sym == SDLK_F7;
-    if (!sobe && app_zap_ativo()) {
-      e->key.keysym.scancode = (SDL_Scancode)NV_SCANCODE_CH_DOWN;
-      e->key.keysym.sym = SDLK_PAGEDOWN;
-    } else {
-      // Controle nao digita "s" nos campos: mesma identidade da AZUL no .tpk.
-      e->key.keysym.scancode = sobe ? (SDL_Scancode)NV_SCANCODE_BLUE : SDL_SCANCODE_F5;
-      e->key.keysym.sym = sobe ? SDLK_s : SDLK_F5;
-    }
-  }
-  // O CH- (428) chega como F8 (tizen-shell.html) e fora do zap e o Spotlight
-  // (F5), como no Android e na LG. Com canal na tela segue sendo CH- de
-  // verdade, pelos scancodes do webOS que guia.c e player.c ja tratam.
-  if ((e->type == SDL_KEYDOWN || e->type == SDL_KEYUP) && e->key.keysym.sym == SDLK_F8) {
-    if (app_zap_ativo()) {
-      e->key.keysym.scancode = (SDL_Scancode)NV_SCANCODE_CH_DOWN;
-      e->key.keysym.sym = SDLK_PAGEDOWN;
-    } else {
-      e->key.keysym.sym = SDLK_F5;
-      e->key.keysym.scancode = SDL_SCANCODE_F5;
-    }
-  }
-#else
   (void)e;
-#endif
 }
 
 // O CH+ CRU, antes de remapCanal: F7 onde o host o entrega assim (Android,
@@ -320,9 +226,6 @@ static void remapCanal(SDL_Event *e) {
 // (central.h); o toque curto volta por entregarCh.
 static int teclaCh(const SDL_Event *e) {
   if (e->type != SDL_KEYDOWN && e->type != SDL_KEYUP) return 0;
-#if defined(NV_ANDROID) || defined(NV_TPK) || defined(__APPLE__) || defined(__EMSCRIPTEN__)
-  if (e->key.keysym.sym == SDLK_F7) return 1;
-#endif
   return e->key.keysym.scancode == (SDL_Scancode)NV_SCANCODE_CH_UP;
 }
 static void entregarCh(SDL_Event *e) {
@@ -392,22 +295,12 @@ static void consome(const char *caminho) {
 // funciona e nada disto entra em jogo.
 static int pedidoNovo(const char *caminho, time_t *bloqueado) {
   struct stat st;
-#ifdef __EMSCRIPTEN__
-  // NAO HA /tmp/nuvio-* NO TIZEN — ninguem injeta tecla nem pede captura por
-  // arquivo la — e cada stat que falha custa um FS.ErrnoError do Emscripten
-  // (Error com pilha capturada + varredura de ERRNO_CODES), no fio principal,
-  // tres vezes por quadro. MEDIDO no Chrome com a build do Tizen: 8,3% do
-  // fio principal em ErrnoError, mais que todo o WASM junto (20/09, #72).
-  (void)caminho; (void)bloqueado; (void)st;
-  return 0;
-#else
   if (stat(caminho, &st) != 0 || st.st_size <= 0) return 0;
   // Pedido que ja foi atendido e nao pode ser esvaziado: ignora enquanto nao
   // mudar. Sem isto ele vale para sempre e o trabalho e refeito por quadro.
   if (*bloqueado && st.st_mtime == *bloqueado) return 0;
   *bloqueado = 0;
   return 1;
-#endif
 }
 
 // Esvazia e confere. Devolve 0 quando NAO conseguiu — dono diferente, sticky
@@ -461,8 +354,8 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
     soltarEm = 0;
   }
   static time_t bloqueadoKey;
-  if (!pedidoNovo("/tmp/nuvio-key", &bloqueadoKey)) return;
-  FILE *f = fopen("/tmp/nuvio-key", "r");
+  if (!pedidoNovo("/tmp/" NV_APP_ID "-key", &bloqueadoKey)) return;
+  FILE *f = fopen("/tmp/" NV_APP_ID "-key", "r");
   if (!f) return;
   // A tecla injetada tambem conta como gente no controle: sem isto a tela de
   // descanso entrava 2 min depois da ultima tecla DE VERDADE, no meio de uma
@@ -550,21 +443,6 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
       continue;
     }
 
-    // NOME DE TECLA DA SAMSUNG ("XF86Blue", "XF86RaiseChannel", "XF86ChannelGuide"...):
-    // a mesma tabela do .tpk (tpkteclas.c) e o mesmo remapeamento de CH+/CH-
-    // do laco principal (remapCanal). E o simulador da Samsung no Mac.
-    if (!strncmp(linha, "XF86", 4)) {
-      SDL_Event t;
-      if (tpkteclas_evento(linha, 1, &t)) {
-        remapCanal(&t);
-        printf("[tecla] injetada %s -> sym=%d scancode=%d\n", linha,
-               (int)t.key.keysym.sym, (int)t.key.keysym.scancode);
-        fflush(stdout);
-        entregar(&t);
-      }
-      if (tpkteclas_evento(linha, 0, &t)) { remapCanal(&t); entregar(&t); }
-      continue;
-    }
     SDL_Keycode k = codigoDaTecla(linha);
     if (!k) continue;
     SDL_Event e; SDL_zero(e);
@@ -578,7 +456,7 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
     else { e.type = SDL_KEYUP; entregar(&e); }
   }
   fclose(f);
-  consomeOuBloqueia("/tmp/nuvio-key", &bloqueadoKey);
+  consomeOuBloqueia("/tmp/" NV_APP_ID "-key", &bloqueadoKey);
 }
 
 // Tamanho do buffer de onde a captura le. Definido no arranque, junto com o
@@ -587,61 +465,16 @@ static int capW = (int)NV_TELA_BASE_W, capH = (int)NV_TELA_BASE_H;
 // Mobile uses the device viewport. Its dimensions and GPU samples cannot
 // decide the remembered TV resolution or trigger a TV 4K fallback.
 static int resolucaoDaTv(void) {
-#ifdef NV_TOUCH_UI
-  return !layout_modo_mobile();
-#else
   return 1;
-#endif
 }
-#ifdef NV_TOUCH_UI
-static Uint32 tvViewportMudouEm;
-static int tvViewportMudou, tvModoMudou;
-static void resolucaoTvViewportMudou(Uint32 agora, int mudouModo) {
-  tvViewportMudouEm = agora;
-  tvViewportMudou = 1;
-  if (mudouModo) tvModoMudou = 1;
-}
-#endif
 // Android restores its fixed TV holder asynchronously. After a live change,
 // allow one report interval to settle, then require a whole unchanged TV
 // interval. Every report still harvests/resets GPU stats, including skipped
 // reports, so a Mobile or resize window cannot decide the TV's saved verdict.
 static int resolucaoTvJanela(Uint32 agora, Uint32 inicio, int w, int h, int pedidoW, int pedidoH) {
-#ifdef NV_TOUCH_UI
-  if (!resolucaoDaTv()) return 0;
-  if (tvViewportMudou && agora - tvViewportMudouEm < agora - inicio + 3000u) return 0;
-  // An initial TV launch may discover that 4K was refused. After toggling,
-  // the smaller drawable can instead be Mobile's holder awaiting restoration.
-  if (tvModoMudou && pedidoW > (int)NV_TELA_BASE_W &&
-      (w != pedidoW || h != pedidoH)) return 0;
-  return 1;
-#else
   (void)agora; (void)inicio; (void)w; (void)h; (void)pedidoW; (void)pedidoH;
   return 1;
-#endif
 }
-#ifdef NV_TOUCH_UI
-static void interfaceViewport(SDL_Window *win, int *width, int *height, int *modo) {
-  int novoW = 0, novoH = 0;
-  int novoModo = layout_modo_mobile();
-  SDL_GL_GetDrawableSize(win, &novoW, &novoH);
-  if (novoW <= 0 || novoH <= 0 ||
-      (novoW == *width && novoH == *height && novoModo == *modo)) return;
-  resolucaoTvViewportMudou(SDL_GetTicks(), novoModo != *modo);
-  *width = novoW; *height = novoH; *modo = novoModo;
-  layout_tela_definir(novoW, novoH);
-  ponteiro_cancelar_toque();
-  gpun_redimensionar(novoW, novoH);
-  glViewport(0, 0, novoW, novoH);
-  gfx_tamanho_alvo(novoW, novoH);
-  video_escala_definir(novoW, novoH);
-  gfx_snap_encerrar();
-  gfx_snap_iniciar((int)NV_TELA_W, (int)NV_TELA_H);
-  capW = novoW; capH = novoH;
-  printf("[interface] modo=%s drawable=%dx%d canvas=%.0fx%.0f\n",
-         novoModo ? "mobile" : "tv", novoW, novoH, NV_TELA_W, NV_TELA_H);
-}
-#endif
 
 // PORTA DE TESTE DO MOTOR P2P: "p2p:<infoHash>" no pedido de video resolve o
 // torrent pelo motor embutido (num fio: metadados, pares, primeiros bytes) e
@@ -673,13 +506,7 @@ static void p2pTesteBombear(void) {
 }
 // No Android nao ha /tmp: o pedido mora na pasta de dados (adb run-as).
 static const char *pedidoVideo(void) {
-#ifdef NV_ANDROID
-  static char p[600];
-  if (!p[0]) snprintf(p, sizeof p, "%s/nuvio-video", dados_dir());
-  return p;
-#else
   return "/tmp/nuvio-video";
-#endif
 }
 
 // Mesmo protocolo das outras ferramentas: escreva uma URL em /tmp/nuvio-video e
@@ -696,7 +523,6 @@ static const char *pedidoVideo(void) {
 // esperar por ele: um fio olha o arquivo a cada 250 ms e o quadro so le duas
 // variaveis atomicas. A linha "[aux] stat ... levou" mostra quando o disco
 // para — era o que faltava para provar o congelamento.
-#ifndef __EMSCRIPTEN__
 static _Atomic long pedVidTam;      // tamanho visto pelo fio (<=0: nada)
 static _Atomic long pedVidMtime;    // st_mtime visto pelo fio
 static _Atomic int pedVidFioOk;     // 1 = o fio esta de pe
@@ -721,13 +547,11 @@ static void *pedVidFio(void *x) {
   }
   return NULL;
 }
-#endif
 static void videoSeSolicitado(void) {
   static time_t bloqueado;
   char url[1024];
   FILE *f;
   p2pTesteBombear();
-#ifndef __EMSCRIPTEN__
   { static int tentou;
     if (!tentou) {
       pthread_t t;
@@ -744,9 +568,6 @@ static void videoSeSolicitado(void) {
       atomic_store(&pedVidTam, -1L);   // atendido; o fio volta a olhar em 250 ms
     } else if (!pedidoNovo(pedidoVideo(), &bloqueado)) return;
   }
-#else
-  if (!pedidoNovo(pedidoVideo(), &bloqueado)) return;
-#endif
   f = fopen(pedidoVideo(), "r");
   if (!f) return;
   if (fgets(url, sizeof url, f)) {
@@ -772,8 +593,8 @@ static void videoSeSolicitado(void) {
 
 static void capturaSeSolicitado(void) {
   static time_t bloqueado;
-  if (!pedidoNovo("/tmp/nuvio-shot-req", &bloqueado)) return;
-  consomeOuBloqueia("/tmp/nuvio-shot-req", &bloqueado);
+  if (!pedidoNovo("/tmp/" NV_APP_ID "-shot-req", &bloqueado)) return;
+  consomeOuBloqueia("/tmp/" NV_APP_ID "-shot-req", &bloqueado);
 
   // Le o DRAWABLE inteiro, nao 1920x1080 fixo: em tela retina o buffer e maior
   // que a janela, e ler o tamanho da janela captura so um quarto da imagem.
@@ -802,51 +623,20 @@ static void capturaSeSolicitado(void) {
   cab[34] = n & 255; cab[35] = (n >> 8) & 255; cab[36] = (n >> 16) & 255; cab[37] = (n >> 24) & 255;
 
   // grava num temporario e so entao renomeia: quem le nunca pega arquivo pela metade
-  FILE *f = fopen("/tmp/.nuvio-shot.tmp", "wb");
+  FILE *f = fopen("/tmp/." NV_APP_ID "-shot.tmp", "wb");
   if (f) {
     fwrite(cab, 1, 54, f);
     fwrite(px, 1, n, f);
     fclose(f);
-    rename("/tmp/.nuvio-shot.tmp", "/tmp/nuvio-shot.bmp");
-    printf("captura: /tmp/nuvio-shot.bmp (%u bytes)\n", tam);
+    rename("/tmp/." NV_APP_ID "-shot.tmp", "/tmp/" NV_APP_ID "-shot.bmp");
+    printf("captura: /tmp/" NV_APP_ID "-shot.bmp (%u bytes)\n", tam);
   }
   free(px);
 }
 
-#ifdef __EMSCRIPTEN__
-// Yield once per frame, preferring rAF with a deadline for drawn player UI.
-//
-// A primeira versao usava emscripten_sleep(0), que vira setTimeout(0). MEDIDO
-// no Chrome: 0,5 FPS, com o proprio app relatando "pior=0.0ms" — o trabalho de
-// desenhar custava zero e o tempo inteiro era espera. Motivo: setTimeout numa
-// aba em segundo plano e estrangulado para uma chamada por segundo, e mesmo em
-// primeiro plano ele nao tem relacao nenhuma com o vsync.
-//
-// EM_ASYNC_JS suspends C through ASYNCIFY until either clock resolves;
-// the main loop continues to own the frame.
-EM_ASYNC_JS(void, nv_ceder_quadro, (int ui), {
-  // Bound browser frame waits while player UI is drawn over hardware video.
-  await new Promise(function (resolve) {
-    var timer, raf = requestAnimationFrame(done);
-    function done() {
-      cancelAnimationFrame(raf);
-      if (timer !== undefined) clearTimeout(timer);
-      resolve();
-    }
-    if (ui) timer = setTimeout(done, 1000 / 60);
-  });
-});
-#endif
 
-#ifdef NV_ANDROID
-#define NV_ETAPA(n) android_etapa(n)
-#else
 #define NV_ETAPA(n) ((void)0)
-#endif
 static int nvPrimeiroQuadroFeito;
-#ifdef __EMSCRIPTEN__
-static int window_primeiro_quadro_feito(void) { return nvPrimeiroQuadroFeito; }
-#endif
 // Para a descoberta (descoberta.h): com conta, a primeira volta espera os
 // addons do perfil em vez de montar a Home com a lista vazia.
 static int esperaAddonsDaConta(void) {
@@ -857,11 +647,7 @@ static int esperaAddonsDaConta(void) {
 
 
 // #317: caminho de arranque defensivo (LG/Tizen/Linux; Android tem o seu).
-#if !defined(NV_ANDROID) && !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
 #define NV_ARRANQUE_REDE 1
-#else
-#define NV_ARRANQUE_REDE 0
-#endif
 #if NV_ARRANQUE_REDE
 #include <dlfcn.h>   // nv_log_egl; no .tpk (NV_SEM_WEBOS) o include de cima nao vale
 // Configs EGL cada vez mais simples: sem profundidade/stencil/MSAA, depois RGB565.
@@ -918,13 +704,6 @@ static void nv_log_egl(void) {
   fflush(stdout);
 }
 #endif
-#ifdef __EMSCRIPTEN__
-static EM_BOOL cicloWgt(int tipo, const EmscriptenVisibilityChangeEvent *e, void *u) {
-  (void)tipo; (void)u;
-  if (e->hidden) { SDL_Event ev = {0}; ev.type = SDL_APP_WILLENTERBACKGROUND; SDL_PushEvent(&ev); }
-  return EM_FALSE;
-}
-#endif
 
 int main(int argc, char **argv) {
   // NUMERO COM PONTO, SEMPRE. O host .NET do .tpk poe o processo no locale do
@@ -937,7 +716,6 @@ int main(int argc, char **argv) {
   // Sem a identidade do app, o SDL do webOS registra a surface como "(null)" e
   // o compositor NAO exibe a janela — o app roda a 60fps desenhando para
   // ninguem. Medido: "Invalid appId specified OR Unsupported Application Type".
-#ifndef NV_SEM_WEBOS
 #ifdef NV_DTS_DEBUG
   setenv("APPID", NV_APP_ID, 1);
   setenv("LS2_APPID", NV_APP_ID, 1);
@@ -946,7 +724,6 @@ int main(int argc, char **argv) {
   setenv("LS2_APPID", NV_APP_ID, 0);
 #endif
   setenv("SDL_VIDEODRIVER", "wayland", 0);
-#endif
   // Lancado pelo SAM, stdout e stderr vao para /dev/null — toda a telemetria
   // (FPS, texturas, teclas) estava sendo descartada em silencio. Log em arquivo
   // e a unica forma de ler qualquer coisa de um app nativo em execucao normal.
@@ -974,19 +751,11 @@ int main(int argc, char **argv) {
     // libass, "[legenda] libass: ...", nunca aparecia) e sobravam ~1600 linhas
     // vazias — os restos dos textos sobrescritos.
     if (log) {
-#if defined(NV_TPK) || defined(NV_ANDROID)
-      const char *anterior = getenv("NUVIO_LOG_ANTERIOR");
-#elif defined(NV_DTS_DEBUG)
       const char *anterior = "/tmp/" NV_APP_ID "-anterior.log";
-#else
-      const char *anterior = "/tmp/nuvio-anterior.log";
-#endif
       if (anterior && *anterior) rename(log, anterior);
       // A medicao tambem inclui logs fora de dados_dir(), como /tmp na LG.
       setenv("NUVIO_LOG", log, 1);
-#if !defined(NV_TPK) && !defined(NV_ANDROID)
       setenv("NUVIO_LOG_ANTERIOR", anterior, 1);
-#endif
       if (freopen(log, "w", stdout)) { fflush(stderr); dup2(fileno(stdout), fileno(stderr)); }
     }
   }
@@ -997,9 +766,6 @@ int main(int argc, char **argv) {
   printf("[dts-debug] appId=%s engine=%d nativeAdapter=%d; diagnostic build, TV validation pending\n",
          NV_APP_ID, dts_engine_available(), dts_pipeline_available(0));
 #endif
-#ifdef NV_ANDROID
-  android_iniciar();   // [tv] no log + espelho no logcat (android.c)
-#endif
   if (!getenv("XDG_RUNTIME_DIR")) setenv("XDG_RUNTIME_DIR", "/tmp/xdg", 1);
 
   // O SAM lanca o app passando o JSON de launch como argv[1], entao so tratamos
@@ -1007,10 +773,6 @@ int main(int argc, char **argv) {
   char dirBuf[512];
   const char *dirArte = NULL;
   if (argc > 1 && argv[1][0] != '{') dirArte = argv[1];
-#ifdef NV_ANDROID
-  // Sem argv util no Android: o NuvioActivity exporta NUVIO_ARTE antes do SDL.
-  if (!dirArte && getenv("NUVIO_ARTE") && getenv("NUVIO_ARTE")[0]) dirArte = getenv("NUVIO_ARTE");
-#endif
   if (!dirArte) {
     char *base = SDL_GetBasePath();
     if (base) { snprintf(dirBuf, sizeof dirBuf, "%sart", base); SDL_free(base); dirArte = dirBuf; }
@@ -1035,39 +797,15 @@ int main(int argc, char **argv) {
   // [ciclo] (nome/estado do evento de janela/app), sem payload nenhum.
 #endif
 
-#ifdef __EMSCRIPTEN__
-  // SDL_Delay NUNCA via emscripten_sleep. Com -sASYNCIFY o SDL2 troca o
-  // SDL_Delay por emscripten_sleep, que so existe no fio principal; os nossos
-  // SDL_Delay estao todos em fios de trabalho (descoberta, streams,
-  // recomenda, atualizacao) e, com ASYNCIFY_ONLY (tizen.sh), um deles aborta
-  // o worker com "invalid state: 1". Com o hint em 0 o SDL_Delay vira o
-  // nanosleep dos pthreads, que e o que sempre se quis ali. O laco de quadro
-  // nao usa SDL_Delay: cede pelo rAF (nv_ceder_quadro).
-  SDL_SetHint(SDL_HINT_EMSCRIPTEN_ASYNCIFY, "0");
-#endif
   NV_ETAPA("SDL_Init");
   arranque_etapa("SDL_Init");
   if (SDL_Init(SDL_INIT_VIDEO) != 0) { printf("SDL_Init: %s\n", SDL_GetError()); return 1; }
-#ifdef __EMSCRIPTEN__
-  emscripten_set_visibilitychange_callback(NULL, EM_TRUE, cicloWgt);
-#endif
   IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG);
   // Antes de qualquer fio: ver nv_blindar_formatos em sdlcompat.h (issue #65).
   nv_blindar_formatos();
 
-#ifdef __APPLE__
-  // Perfil de compatibilidade: e o unico do macOS que ainda aceita GLSL 1.20 e
-  // as funcoes fixas que o GLES2 tem como core.
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
-  Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
-#else
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-#ifdef NV_LINUX_DESKTOP
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#endif
   // Canal alpha no framebuffer. Sem ele a superficie nao tem como ficar
   // transparente, e o plano de video do aparelho — que fica ATRAS da janela e
   // so aparece pelo alpha — nunca poderia ser revelado.
@@ -1079,15 +817,7 @@ int main(int argc, char **argv) {
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-#if defined(__EMSCRIPTEN__) || defined(NV_LINUX_DESKTOP)
-  // Desktop preview is windowed; browser fullscreen requires a user gesture.
-  // O navegador da TV ja entrega a pagina em tela cheia; pedir FULLSCREEN
-  // aqui exigiria um gesto do usuario e falharia em silencio.
-  Uint32 flags = SDL_WINDOW_OPENGL;
-#else
   Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN;
-#endif
-#endif
   // 4K NAO E POSSIVEL NESTE APARELHO — MEDIDO, nao presumido.
   //
   // A TV e 4K, e a ideia (do dono) era renderizar em 3840x2160 e desenhar tudo
@@ -1131,10 +861,6 @@ int main(int argc, char **argv) {
   // ja esta resolvido desde o topo do main.
   NV_ETAPA("dados_iniciar");
   dados_iniciar(dirArte);
-#ifdef NV_ANDROID
-  nv_android_cache_migrate(dados_dir());
-  nv_android_cache_trim(NV_ANDROID_CACHE_BYTES);
-#endif
   dados_espaco_iniciar(dirArte);
   negcache_disco(dados_ler, dados_gravar_leve);   // 404 de API de metadados lembrado entre arranques
   #ifdef NV_LEVE
@@ -1220,36 +946,7 @@ int main(int argc, char **argv) {
     if (quer4k) { printf("[4k] pedindo %dx%d — a linha `janela=` abaixo diz o "
                          "que a TV concedeu\n", pedeW, pedeH); fflush(stdout); } }
   SDL_Window *win;
-#ifdef NV_TPK
-  tpk_pedir_saida(pedeW, pedeH);
-#endif
-#ifdef NV_ANDROID
-  // No Android a janela do SDL tem o tamanho da SUPERFICIE: pedir 3840x2160 ao
-  // SDL_CreateWindow nao muda nada. Ver android_pedir_superficie.
-  // TV mode preserves the integration surface; app mode explicitly asks for 4K,
-  // and 720p explicitly asks for 1280x720 (the TV scaler upscales for free).
-  if (pedeW > (int)NV_TELA_W || pedeW < (int)NV_TELA_W)
-    android_pedir_superficie(pedeW, pedeH);
-#endif
   const char *windowTitle = "Nuvio";
-#ifdef NV_LINUX_DESKTOP
-  windowTitle = "Nuvio - Linux UI preview";
-#endif
-#ifdef NV_ANDROID
-  int hdrPedido = ajustes_hdr_interface();
-  int hdrColor = hdrPedido && android_hdr_interface(1);
-  SDL_SetHint("NUVIO_HDR_REQUESTED", hdrPedido ? "1" : "0");
-  SDL_SetHint("NUVIO_HDR_EGL", "none");
-  SDL_SetHint("NUVIO_HDR_CONFIG", "unknown");
-  SDL_SetHint("NUVIO_HDR_UI", hdrColor ? "1" : "0");
-  if (hdrColor) {
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 10);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 10);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 10);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 2);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
-  }
-#endif
   NV_ETAPA("SDL_CreateWindow");
   arranque_etapa("SDL_CreateWindow");
   win = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED,
@@ -1262,55 +959,9 @@ int main(int argc, char **argv) {
   if (!win) { printf("[arranque] SDL_CreateWindow falhou: %s\n", SDL_GetError()); fflush(stdout); }
   win = nv_janela_simples(win, windowTitle, pedeW, pedeH, flags);
 #endif
-#ifdef NV_ANDROID
-  // CONFIG EGL DE RESERVA (#266). No Android o SDL_CreateWindow ja escolhe a
-  // config EGL e cria a superficie; um driver que recusa RGBA8888 (+ a
-  // profundidade 16 padrao do SDL) devolvia "janela: ..." e o app fechava sem
-  // dizer nada na tela. Tenta configs cada vez mais simples, cada tentativa no
-  // log. Sem alfa o video por baixo nao aparece, mas a interface abre e o
-  // registro sai — melhor que nada.
-  { static const struct { int r, g, b, a, prof; const char *nome; } reserva[] = {
-      { 8, 8, 8, 8, 0, "RGBA8888 sem profundidade" },
-      { 8, 8, 8, 0, 0, "RGB888 sem alfa" },
-      { 5, 6, 5, 0, 0, "RGB565" },
-    };
-    size_t i;
-    if (!win && hdrColor) {
-      printf("[hdr-ui] config=1010102 failed=%s; trying FP16\n", SDL_GetError());
-      SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 16);
-      SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 16);
-      SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 16);
-      SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 16);
-      SDL_GL_SetAttribute(SDL_GL_FLOATBUFFERS, 1);
-      win = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                             pedeW, pedeH, flags);
-      if (!win) {
-        printf("[hdr-ui] config=FP16 failed=%s; trying SDR\n", SDL_GetError());
-        SDL_GL_SetAttribute(SDL_GL_FLOATBUFFERS, 0);
-        SDL_SetHint("NUVIO_HDR_UI", "0"); android_hdr_interface(0);
-      }
-    }
-    for (i = 0; !win && i < sizeof reserva / sizeof reserva[0]; i++) {
-      printf("[android] janela falhou (%s); tentando EGL %s\n", SDL_GetError(), reserva[i].nome);
-      fflush(stdout);
-      SDL_GL_SetAttribute(SDL_GL_RED_SIZE, reserva[i].r);
-      SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, reserva[i].g);
-      SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, reserva[i].b);
-      SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, reserva[i].a);
-      SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, reserva[i].prof);
-      SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
-      win = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                             pedeW, pedeH, flags);
-    }
-    if (win && i) { printf("[android] janela com EGL de reserva: %s\n", reserva[i - 1].nome); fflush(stdout); }
-  }
-#endif
   if (!win && pedeW == 3840 && ajustes_ampliar_app()) {
     // A rejected UHD surface must not prevent opening Settings again.
     printf("[gpu-nivel] 4K window rejected: retrying 1920x1080\n");
-#ifdef NV_ANDROID
-    android_pedir_superficie((int)NV_TELA_W, (int)NV_TELA_H);
-#endif
     win = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                            (int)NV_TELA_W, (int)NV_TELA_H, flags);
   }
@@ -1330,12 +981,7 @@ int main(int argc, char **argv) {
   // e MOUSEBUTTONDOWN/UP botao 1 no clique. Por isso aqui ele fica ligado, e a
   // seta desenhada e a do proprio sistema (ponteiro.c nao desenha outra).
   // No Mac o cursor do sistema continua escondido e o app desenha o seu.
-#ifdef NV_SEM_WEBOS
-  SDL_ShowCursor(SDL_DISABLE);
-#else
   SDL_ShowCursor(SDL_ENABLE);
-#endif
-#ifndef NV_SEM_WEBOS
   // Declara a superficie NAO-opaca. Por padrao o compositor trata a janela como
   // opaca e descarta o canal alpha inteiro — o furo do gfx_furo existiria no
   // framebuffer e mesmo assim nada apareceria atras dele.
@@ -1381,7 +1027,6 @@ int main(int argc, char **argv) {
       }
     }
   }
-#endif
   NV_ETAPA("SDL_GL_CreateContext");
   arranque_etapa("SDL_GL_CreateContext");
   SDL_GLContext ctx = SDL_GL_CreateContext(win);
@@ -1401,95 +1046,19 @@ int main(int argc, char **argv) {
   }
   nv_log_egl();
 #endif
-#ifdef NV_LINUX_DESKTOP
-  if (!ctx) {
-    printf("[linux] sem contexto GLES2: %s\n", SDL_GetError());
-    SDL_DestroyWindow(win); SDL_Quit(); return 2;
-  }
-#endif
-#ifdef NV_TPK
-  // Sem GL (Tizen 4/5 sem superficie) nao ha o que desenhar; sai e o host
-  // mostra o motivo (nv_tpk_erro).
-  if (!ctx) { printf("[tpk] sem contexto GL, saindo\n"); SDL_Quit(); return 2; }
-#endif
-#ifdef NV_ANDROID
-  if (!ctx) {
-    // A janela ja existe com a config escolhida; recriar janela e contexto
-    // numa config mais simples (o contexto ES2 e o mesmo pedido em todas).
-    printf("[android] sem contexto GL: %s; tentando RGBA8888 sem profundidade\n", SDL_GetError());
-    fflush(stdout);
-    SDL_DestroyWindow(win);
-    SDL_SetHint("NUVIO_HDR_UI", "0");
-    if (hdrColor) { SDL_GL_SetAttribute(SDL_GL_FLOATBUFFERS, 0); android_hdr_interface(0); }
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
-    win = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                           pedeW, pedeH, flags);
-    ctx = win ? SDL_GL_CreateContext(win) : NULL;
-  }
-  if (!ctx) { printf("[android] sem contexto GL: %s\n", SDL_GetError()); SDL_Quit(); return 2; }
-#endif
-#ifdef NV_ANDROID
-  { const char *space = SDL_GetHint("NUVIO_HDR_EGL");
-    int r = 0, g = 0, b = 0, a = 0;
-    SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &r); SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &g);
-    SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &b); SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &a);
-    /* SDL_GL_GetAttribute queries GL framebuffer bits, not the EGL config.
-       The synchronous surface hook publishes only verified HDR configs. */
-    const char *config = SDL_GetHint("NUVIO_HDR_CONFIG");
-    int ten = config && !strcmp(config, "1010102");
-    int fp16 = config && !strcmp(config, "FP16");
-    gfx_hdr_output = 0;
-    if (hdrColor && SDL_GetHintBoolean("NUVIO_HDR_UI", SDL_FALSE) && space) {
-      if (ten) {
-        if (!strcmp(space, "pq")) gfx_hdr_output = 1;
-        else if (!strcmp(space, "pq-limited")) gfx_hdr_output = 5;
-        else if (!strcmp(space, "hlg")) gfx_hdr_output = 3;
-      } else if (fp16) {
-        if (!strcmp(space, "scrgb-linear")) gfx_hdr_output = 2;
-        else if (!strcmp(space, "bt2020-linear")) gfx_hdr_output = 4;
-      }
-    }
-    if (hdrPedido) {
-      if (!gfx_hdr_output) android_hdr_interface(0);
-      printf("[hdr-ui] pedido=on colormode=%s egl=%s config=%s resultado=%s dataspace=%s gl=%d/%d/%d/%d blit=%d white=203\n",
-             hdrColor ? "ok" : "unsupported",
-             !gfx_hdr_output ? "none" : gfx_hdr_output == 3 ? "hlg" : fp16 ? "scrgb" : "pq",
-             gfx_hdr_output ? config : "8888", gfx_hdr_output ? "hdr" : "sdr",
-             gfx_hdr_output ? space : "none", r, g, b, a, gfx_hdr_output);
-      fflush(stdout);
-    }
-  }
-#endif
   // Capability is known only after creating the GL context. A saved app choice
   // must not leave a weak GPU paying for a 4K drawable.
   if (resolucaoDaTv() && ajustes_ampliar_app() &&
       (ajustes_720p() || ajustes_1080p()) && !gpun_upscale_suportado()) {
     int fallbackW = ajustes_720p() ? 1280 : (int)NV_TELA_W;
     int fallbackH = ajustes_720p() ? 720 : (int)NV_TELA_H;
-#ifdef NV_ANDROID
-    android_pedir_superficie(fallbackW, fallbackH);
-#endif
     SDL_SetWindowSize(win, fallbackW, fallbackH);
     printf("[gpu-nivel] app 4K unavailable: restoring TV surface\n");
   }
   // O cursor do Magic Remote e desenhado pelo app (ponteiro.c). Depois do
   // contexto: o log de arranque dele le a janela corrente.
   ponteiro_iniciar();
-#ifdef __APPLE__
-  // Sem vsync no Mac. O SDL2 do Homebrew virou uma camada sobre o SDL3
-  // (sdl2-compat), e nela o SwapWindow fica preso esperando um sinal de vsync
-  // que nunca chega quando a janela nao esta em primeiro plano — o app trava no
-  // primeiro quadro. No aparelho o SDL2 e o de verdade e o vsync fica ligado,
-  // que e o que mantem os 60fps estaveis la.
-  SDL_GL_SetSwapInterval(0);
-#else
   SDL_GL_SetSwapInterval(1);
-#endif
   // O tamanho REAL do buffer importa mais que o tamanho pedido: esta TV e 4K, e
   // se o compositor entregar uma superficie 3840x2160 cada camada de tela cheia
   // custa quatro vezes o que a conta de 1080p diz.
@@ -1500,11 +1069,6 @@ int main(int argc, char **argv) {
   if (resolucaoDaTv() && ajustes_ampliar_app() && (ajustes_720p() || ajustes_1080p()))
     printf("[gpu-nivel] app output requested=%dx%d drawable=%dx%d%s\n",
            pedeW, pedeH, dw, dh, dw < 3840 || dh < 2160 ? " (platform limit; TV completes 4K)" : "");
-#ifdef NV_TOUCH_UI
-  // Video scale reads the virtual canvas; establish the saved mode's physical
-  // aspect ratio before positioning the first native video plane.
-  layout_tela_definir(dw, dh);
-#endif
   printf("GPU: %s | %s\n", glGetString(GL_RENDERER), glGetString(GL_VERSION));
   printf("janela=%dx%d drawable=%dx%d\n", jw, jh, dw, dh);
   // O plano de video e posicionado em pixels da superficie, o layout em 1920x1080
@@ -1540,36 +1104,9 @@ int main(int argc, char **argv) {
   // Em tela retina o drawable e maior que a janela; sem ajustar o viewport, o
   // desenho ocupa um quarto da tela.
   SDL_GL_GetDrawableSize(win, &dw, &dh);
-#ifdef NV_TOUCH_UI
-  layout_tela_definir(dw, dh);
-  printf("[interface] modo=%s drawable=%dx%d canvas=%.0fx%.0f\n",
-         layout_modo_mobile() ? "mobile" : "tv", dw, dh, NV_TELA_W, NV_TELA_H);
-#endif
   glViewport(0, 0, dw, dh);
   gfx_tamanho_alvo(dw, dh);
   capW = dw; capH = dh;
-#ifdef NV_ANDROID
-  // QUADRO DE ESPERA NA COR DA SPLASH. A SurfaceView do SDL fura a janela: com
-  // ela no ar, o fundo da janela (drawable/abertura.xml) some atras do furo e o
-  // que aparece e PRETO ate o primeiro SwapWindow — medido no emulador Android
-  // TV, ~700 ms entre a splash do sistema e a abertura; a TCL da #223 levou
-  // 2,8 s para o primeiro quadro. Um clear + swap aqui, antes dos shaders, troca
-  // esse preto pela cor lisa da abertura (#0E0F12, a mesma de values/cores.xml). So no
-  // Android: na LG o sistema segura o splash.png ate o primeiro quadro, e uma
-  // cor lisa aqui apagaria a marca.
-  glClearColor(14.0f / 255.0f, 15.0f / 255.0f, 18.0f / 255.0f, 1.0f);
-  glClear(GL_COLOR_BUFFER_BIT);
-  SDL_GL_SwapWindow(win);
-  // TESTE DO VIGIA (#266): `run-as ... touch files/dados/teste-travar-arranque`
-  // prende o main() aqui, como numa TV que nao passa da tela preta.
-  { char f[600];
-    snprintf(f, sizeof f, "%s/teste-travar-arranque", dados_dir());
-    if (dados_dir()[0] && access(f, F_OK) == 0) {
-      printf("[android] teste: arranque preso de proposito (%s)\n", f); fflush(stdout);
-      android_etapa("teste-travar-arranque");
-      for (;;) SDL_Delay(1000);
-    } }
-#endif
 
   // O relogio dos marcos comeca AQUI e nao no topo do main: o que vem antes e
   // parse de argumento e SDL_Init, que nao dependem de nada nosso.
@@ -1581,42 +1118,11 @@ int main(int argc, char **argv) {
   // Discord alone uses the bundled Mozilla roots on native TV builds.
   char discordCa[4096];
   snprintf(discordCa, sizeof discordCa, "%s/discord-ca.pem", dirArte);
-#if (defined(__APPLE__) || defined(NV_LINUX_DESKTOP)) && !defined(NV_ANDROID) && !defined(NV_TPK)
-  FILE *discordRoots = fopen(discordCa, "rb");
-  if (discordRoots) fclose(discordRoots);
-  else discordCa[0] = 0; // Desktop development can use system trust.
-#endif
-#ifdef NV_TPK
-  // #290: the .tpk in-app update replaces only libnuvio.so; res/art is the
-  // one from the installed package, and discord-ca.pem only ships since
-  // 1.7.4. A CAINFO pointing at a missing file makes curl fail every verified
-  // https request at once (CURLE_SSL_CACERT_BADFILE). Without the bundle,
-  // fall back to the TV's own trust store.
-  if (access(discordCa, R_OK) != 0) {
-    printf("[rede] %s missing from the package: using the TV's CA store\n", discordCa);
-    fflush(stdout);
-    discordCa[0] = 0;
-  }
-#endif
   rede_discord_ca(discordCa);
   rede_preparar();
   arranque_enviar();   // #317: se a sessao anterior morreu no arranque, conta isso ao servidor (1x)
-#if defined(NV_TPK) || defined(__EMSCRIPTEN__)
-  // SAMSUNG (.tpk e .wgt): nunca Dolby Vision (regra do dono; o Player do Tizen falha no
-  // Prepare, 42% dos picks DV nos logs 2.0.2). HDR10/HDR10+ por modelo nao tem
-  // API antes de tocar: -1 = desconhecido, nao penaliza. Android informa a
-  // tela pelo NvPlayer (nativeTela); webOS nao tem consulta antes do pipeline.
-  stream_definir_tela(-1, 0);
-  printf("[video] samsung tela hdr=-1 dv=0\n");
-#endif
   // NIVEL DE GPU (gpunivel.h): le GL_*, marca a GPU fraca no perfil e decide
   // o nivel de partida ANTES de tex_iniciar, que tira o perfil do aparelho.
-#ifdef NV_ANDROID
-  // #266: garante o contexto GL corrente neste fio antes das consultas (o
-  // primeiro SwapWindow ja saiu acima).
-  NV_ETAPA("GL MakeCurrent");
-  if (SDL_GL_GetCurrentContext() != ctx) SDL_GL_MakeCurrent(win, ctx);
-#endif
   gpun_iniciar(dw, dh);
   { const char *gr = (const char *)glGetString(GL_RENDERER);
     if (ptv_gpu_utgard(gr)) ajustes_trailer_hero_vetar(gr); }
@@ -1624,49 +1130,36 @@ int main(int argc, char **argv) {
   int gpuPref = ajustes_gpu_efeitos();
   if (gpuPref) gpun_preferencia(gpuPref);
   if (ajustes_720p()) gpun_forcar_720();
-  else if (ajustes_1080p() && dw > (int)NV_TELA_W) gpun_alvo_1080();
-  // Scale to the granted drawable, including 1080p when 4K is refused.
-  gpun_ampliar_app(resolucaoDaTv() && ajustes_ampliar_app() &&
-                   (ajustes_720p() || ajustes_1080p()));
-#ifdef NV_TPK
-  video_tpk_zoom_roi_definir(ajustes_trailer_zoom_tpk());
-#endif
+  else if ((ajustes_1080p() || ajustes_4k()) && dw > (int)NV_TELA_W) gpun_alvo_1080();
+  // Abordagem B: interface interna 1080p ampliada para superficie 4K.
+  gpun_ampliar_app(resolucaoDaTv() && (ajustes_ampliar_app() || ajustes_4k()) &&
+                   (ajustes_720p() || ajustes_1080p() || ajustes_4k()));
   texto_sistema_mic_modo(ajustes_mic_busca());   // .tpk/.wgt; nas outras nao faz nada
   printf("[arranque] gfx_iniciar (compila os shaders)\n"); fflush(stdout);
   marco("gfx_iniciar");
   NV_ETAPA("gfx_iniciar (shaders)");
   arranque_etapa("gfx_iniciar");
   if (!gfx_iniciar()) { printf("[arranque] gfx_iniciar FALHOU\n"); fflush(stdout); return 1; }
+  marco("gfx: shaders prontos");
   printf("[arranque] gfx_iniciar ok\n"); fflush(stdout);
   // A marca da abertura (#213), ANTES do primeiro quadro: ele ja nasce com ela,
   // no lugar em que o splash do sistema a deixou.
   logoapp_iniciar(dirArte);
+  marco("splash: inicio");
   abertura_iniciar(dirArte);
+  marco("splash: pronta");
   ajustes_texturas_dir(dirArte);   // materiais CC0 do tema Textura (recorte fraco)
-#ifdef __EMSCRIPTEN__
-  // O ARRANQUE CEDE AO NAVEGADOR EM DOIS PONTOS (24/09/2026). Do topo do main
-  // ate o primeiro quadro era UMA tarefa so do fio principal: 1,0 a 3,4 s nos
-  // registros da Samsung (`[t] ... primeiro quadro na tela` = 1067, 1455,
-  // 2561, 3253, 3448 ms; `longtask-max=2755`/`4325 ms` no primeiro relatorio).
-  // A maior parte e a compilacao dos shaders (gfx_iniciar: 0,7 a 2,0 s na TV
-  // de 1 GB) e o resto e app_iniciar + a montagem do primeiro quadro. Ceder um
-  // rAF aqui e depois de app_iniciar nao encurta nada disso; parte a tarefa
-  // em tres, e o navegador (e o vigia de pagina que nao responde, se a TV tiver
-  // um) ve a pagina respirar no meio. O canvas ainda nao tem nada desenhado.
-  nv_ceder_quadro(0);
-#endif
   // fonts/ fica ao lado de art/: derruba o ultimo componente do caminho da arte
   char dirRec[512];
   snprintf(dirRec, sizeof dirRec, "%s", dirArte);
   char *barra = strrchr(dirRec, '/');
   if (barra) *barra = 0;
   NV_ETAPA("txt_iniciar");
-  txt_iniciar(dirRec, (float)dw / NV_TELA_W);
+  float escAlvo = (gpun_alvo_1080_ativo() || (resolucaoDaTv() && (ajustes_1080p() || ajustes_4k()) && dw > (int)NV_TELA_W)) ? 1.0f : (float)dw / NV_TELA_W;
+  txt_iniciar(dirRec, escAlvo);
   // A MESMA escala vai para o cache de texturas: e ela que decide o teto de
   // decodificacao de cada arte a partir da largura com que o card a desenha.
-  // Sem isto todo card decodificava com o teto unico de 640 e o cache batia no
-  // orcamento com ~40 texturas.
-  tex_escala((float)dw / NV_TELA_W);
+  tex_escala(escAlvo);
   marco("fontes+tex prontos");
   // 192 slots, nao 96. O teto de slots so faz sentido junto com o tamanho de
   // cada textura: com o teto unico de 640 cada uma custava 2,4 MB e 96 slots ja
@@ -1676,12 +1169,6 @@ int main(int argc, char **argv) {
   //
   // Isso tambem dobra o teto de itens EM VOO, que e nMax/3 em slotLivre: a
   // fileira que entra na tela pede tudo de uma vez em vez de pedir aos poucos.
-#ifdef __EMSCRIPTEN__
-  // O DECODIFICADOR DO NAVEGADOR NASCE AQUI, e nao no primeiro pedido: criar
-  // Worker e canal e trabalho do fio principal, e no primeiro pedido ele ja
-  // podia estar preso numa tarefa longa (ver o canal direto em webp.c).
-  navegador_iniciar();
-#endif
   NV_ETAPA("tex_iniciar");
   tex_iniciar(192);
   { int mb = 0; long mem = 0;
@@ -1721,9 +1208,6 @@ int main(int argc, char **argv) {
   // Cor viva: a paleta da ultima cena volta ANTES do primeiro quadro, entao
   // quem usa o tema dinamico ja abre o app na cor do ultimo titulo.
   corviva_carregar();
-#ifdef __EMSCRIPTEN__
-  nv_ceder_quadro(0);   // o segundo ponto: ver a nota logo depois de gfx_iniciar
-#endif
   // Progresso e dado DO USUARIO: sai da pasta do pacote, que e a mesma para
   // todo mundo que usar o aparelho, e passa para a pasta da instalacao.
   if (dados_dir()[0]) cat_dir_gravacao(dados_dir());
@@ -1770,9 +1254,6 @@ int main(int argc, char **argv) {
     // a pasta IDBFS continua disponivel para o caminho legado de GIFs.
     char c[600];
     snprintf(c, sizeof c, "%s/cache", dirDados);
-#ifdef NV_ANDROID
-    snprintf(c, sizeof c, "%s/images", nv_android_cache_dir());
-#endif
     tex_cache_dir(c); }
   // Os icones da interface saem de art/icones (SVG do app web rasterizados).
   gfx_icones_dir(dirArte);
@@ -1800,7 +1281,7 @@ int main(int argc, char **argv) {
   static int rastroQuadros;
   static double gpuFillSoma, gpuFillPico;   // [gpu-modos] fill: media e pico da janela
   static int gpuFillN;
-#if defined(NV_TPK) || defined(NV_ANDROID) || defined(NV_WEBOS)
+#if defined(NV_WEBOS)
   int gpuRelatoCena = 0, gpuRelatoCheia = 0, gpuRelatoMisto = 0;
   SDL_DisplayMode gpuModo;
   // Swap cadence can fall with FPS; prefer the panel's advertised refresh.
@@ -1812,6 +1293,7 @@ int main(int argc, char **argv) {
   int quadros = 0, janks = 0; double pior = 0;
   int playerUiPrevious = 0;
   SwapInt swapInt = {0};   // intervalo real entre swaps (swapint.h)
+  int appJanelaOculta = 0;
 
   // TELEMETRIA POR FASE. O quadro pior custava 22ms num alvo de 20ms e nao
   // havia como saber ONDE. Os relogios sao de CPU (SDL_GetPerformanceCounter)
@@ -1822,9 +1304,9 @@ int main(int argc, char **argv) {
   // devia — um quadro pesado de GPU aparece como swap grande, um quadro pesado
   // de CPU aparece na fase que o causou.
   double perFreq = (double)SDL_GetPerformanceFrequency();
-  double fEv=0, fBomb=0, fUpd=0, fDes=0, fSwap=0, fAux=0, fClr=0;
+  double fEv=0, fBomb=0, fUpd=0, fDes=0, fSwap=0, fAux=0, fClr=0, fCena=0, fAmplia=0;
   int fUplN=0, pUplN=0; long fUplB=0, pUplB=0;
-  double pEv=0, pBomb=0, pUpd=0, pDes=0, pSwap=0, pAux=0, pClr=0;
+  double pEv=0, pBomb=0, pUpd=0, pDes=0, pSwap=0, pAux=0, pClr=0, pCena=0, pAmplia=0;
   double pPrep=0, pGlClr=0;
   // Dentro de `des`: quanto e travessia de GL e quanto e busca no cache.
   double fFill=0, pFill=0; int fNCheio=0, pNCheio=0;
@@ -1834,23 +1316,6 @@ int main(int argc, char **argv) {
 #define NV_T0() (SDL_GetPerformanceCounter())
 #define NV_DT(a) ((SDL_GetPerformanceCounter() - (a)) * 1000.0 / perFreq)
 
-#ifdef __EMSCRIPTEN__
-  // DE QUEM E A TAREFA LONGA (23/09/2026). O [navegador] diz que o fio
-  // principal parou 1 a 31 s (Samsung 1.4.1), mas nao se foi o NOSSO quadro
-  // ou o que roda entre dois quadros (chamadas proxiadas dos pthreads, IDBFS,
-  // timers do shell, o proprio navegador). Com o FPS abaixo de 7 nem o
-  // [quadro] aparecia (o `quadros > 20` abaixo), e era exatamente quando as
-  // tarefas eram maiores. c-max: o maior trecho de C sem ceder (do retorno de
-  // nv_ceder_quadro ate a proxima chamada: uma tarefa do navegador inteira e
-  // nossa). fora-max: a maior espera dentro de nv_ceder_quadro (o que o
-  // navegador fez no meio). longtask-max ~ fora-max com c-max pequeno = nao
-  // e codigo do laco.
-  Uint64 fimCeder = SDL_GetPerformanceCounter();
-  double cMaxMs = 0, foraMaxMs = 0;
-#endif
-#ifdef NV_TOUCH_UI
-  int viewportModo = layout_modo_mobile();
-#endif
   while (!app_quer_sair()
 #ifdef NV_SINAL_TERMINAR
          && !sinalTerminou
@@ -1863,28 +1328,9 @@ int main(int argc, char **argv) {
     // aqui nenhum ponteiro de item do quadro anterior esta mais na mao, entao
     // os blocos trocados fora durante ele podem morrer. Ver cat_quadro.
     cat_quadro();
-#ifdef __EMSCRIPTEN__
-    // FASE ATUAL para o observer de longtask do shell (window.__nvFase): a
-    // tarefa longa e atribuida a quem estava em cena quando ela foi vista.
-    // So cruza para o JS quando a fase muda (poucas vezes por sessao).
-    { static const char *faseAnt;
-      static int jaPrimeiro;
-      const char *fase;
-      if (!jaPrimeiro && window_primeiro_quadro_feito()) jaPrimeiro = 1;
-      fase = !jaPrimeiro ? "startup" : (player_aberto() ? "player"
-           : (desc_montando() ? "catalog" : "home"));
-      if (fase != faseAnt) { faseAnt = fase; EM_ASM({ window.__nvFase = UTF8ToString($0); }, fase); }
-    }
-#endif
     // Enquanto o detalhe existe ele fica com o teclado inteiro: a home
     // continua desenhada por baixo, mas nao deve reagir ao D-pad.
     while (SDL_PollEvent(&e)) {
-#if defined(NV_ANDROID) && defined(NV_TOUCH_UI)
-      if (android_toque_cancelado(&e)) {
-        ponteiro_cancelar_toque();
-        continue;
-      }
-#endif
       ponteiro_diag(&e);
       // PROTECAO DE OLED (esmaecer.h): toda acao da pessoa acorda a tela, e a
       // tecla que acorda so acorda — nao age.
@@ -1920,13 +1366,10 @@ int main(int argc, char **argv) {
           ponteiro_evento(&e, app_evento);
           quadroc_suspendeu(&quadroRel);   // suspendeu: o relogio para de valer
         }
-#ifdef NV_TOUCH_UI
-        if (e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
-            e.window.event == SDL_WINDOWEVENT_RESIZED) {
-          ponteiro_evento(&e, app_evento);
-          interfaceViewport(win, &dw, &dh, &viewportModo);
-        }
-#endif
+        if (e.window.event == SDL_WINDOWEVENT_HIDDEN || e.window.event == SDL_WINDOWEVENT_MINIMIZED)
+          appJanelaOculta = 1;
+        else if (e.window.event == SDL_WINDOWEVENT_SHOWN || e.window.event == SDL_WINDOWEVENT_RESTORED)
+          appJanelaOculta = 0;
         // Ultimo sinal de vida na marca de sessao (avisos_sinal): e o que diz,
         // na abertura seguinte, se a sessao que "nao se despediu" tinha ido
         // para segundo plano antes de morrer.
@@ -1971,6 +1414,10 @@ int main(int argc, char **argv) {
         fflush(stdout);
       }
       player_ciclo_evento(e.type);
+      if (e.type == SDL_APP_WILLENTERBACKGROUND || e.type == SDL_APP_DIDENTERBACKGROUND)
+        appJanelaOculta = 1;
+      else if (e.type == SDL_APP_WILLENTERFOREGROUND || e.type == SDL_APP_DIDENTERFOREGROUND)
+        appJanelaOculta = 0;
       if (e.type == SDL_APP_DIDENTERFOREGROUND) { atualizacao_retomou(); quadroc_suspendeu(&quadroRel); }
       // PONTEIRO (Magic Remote, issue #99): mouse, rodinha e os avisos 484/485
       // de cursor do webOS ficam la; o que ele traduz em tecla chega a
@@ -1978,24 +1425,6 @@ int main(int argc, char **argv) {
       if (ponteiro_evento(&e, app_evento)) continue;
       // webOS Back uses scancode 482, sym 0. Normalize both edges below so
       // the player Back guard sees the physical release too.
-#if defined(__EMSCRIPTEN__) || defined(NV_LINUX_DESKTOP)
-      // TIZEN: o Return do controle Samsung e o keyCode 10009 (XF86Back), que
-      // nao existe na tabela do SDL. tizen-shell.html o traduz em Escape, e
-      // AQUI o Escape vira AC_BACK — o mesmo codigo que o webOS entrega.
-      //
-      // Normalizar no ponto unico, e nao tela a tela, porque o defeito
-      // apareceu justamente onde faltava: a filmografia so tratava AC_BACK
-      // (detail.c), entao no Tizen o voltar nao voltava dali. Corrigir so
-      // aquela tela deixaria a proxima com a mesma armadilha. Conferido antes:
-      // nenhuma tela do app trata ESCAPE sem tratar AC_BACK junto, entao a
-      // conversao nao tira nada de ninguem.
-      if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)
-        e.key.keysym.sym = SDLK_AC_BACK;
-#ifdef NV_LINUX_DESKTOP
-      if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_BACKSPACE)
-        e.key.keysym.sym = SDLK_AC_BACK;
-#endif
-#endif
       // CH+ segurado x tocado (central.h). Com canal na tela (zap) ele segue
       // direto, sem atraso.
       if (teclaCh(&e) && central_tecla(&e, !app_zap_ativo() && app_central_pode())) continue;
@@ -2032,13 +1461,13 @@ int main(int argc, char **argv) {
     }
     central_tecla_quadro(SDL_GetTicks(), entregarCh);
     teclasInjetadas(app_evento);
-#ifdef NV_TOUCH_UI
-    // A saved mode change must refresh every target even when SDL keeps the
-    // same drawable size and sends no window event.
-    interfaceViewport(win, &dw, &dh, &viewportModo);
-#endif
     texto_sistema_quadro();
     fEv = NV_DT(tEv);
+
+    if (appJanelaOculta && !video_ativo() && !video_tocando()) {
+      SDL_Delay(50);
+      continue;
+    }
 
     Uint32 agora = SDL_GetTicks();
     // dt VEM DO RELOGIO DE ALTA RESOLUCAO, nao de SDL_GetTicks.
@@ -2108,7 +1537,7 @@ int main(int argc, char **argv) {
     // a three-second window has only 15 frames and otherwise reports 0 ms.
     if (nvPrimeiroQuadroFeito) {
       if (dtms > pior) { pior = dtms; piorTxtMs = txtMsQuadro; piorTxtN = txtNQuadro;
-                         pEv=fEv; pBomb=fBomb; pUpd=fUpd; pDes=fDes; pSwap=fSwap; pAux=fAux; pClr=fClr; pPrep=fPrep; pGlClr=fGlClr;
+                         pEv=fEv; pBomb=fBomb; pUpd=fUpd; pDes=fDes; pCena=fCena; pAmplia=fAmplia; pSwap=fSwap; pAux=fAux; pClr=fClr; pPrep=fPrep; pGlClr=fGlClr;
                          pUplN=fUplN; pUplB=fUplB;
                          pGfxMs=fGfxMs; pTexMs=fTexMs; pNRect=fNRect; pNProg=fNProg;
                          pNBind=fNBind; pNBusca=fNBusca; pOutMs=fOutMs; pNOut=fNOut; pFill=fFill; pNCheio=fNCheio; pTela=fTela; pTrans=fTrans; }
@@ -2129,7 +1558,7 @@ int main(int argc, char **argv) {
       for (k = 0; k < GFX_NMODOS; k++) if (gfx_fill_modo[k] > 0.02) printf(" %d=%.2f", k, gfx_fill_modo[k]);
       printf("\n");
     }
-#if defined(NV_TPK) || defined(NV_ANDROID) || defined(NV_WEBOS)
+#if defined(NV_WEBOS)
     // NIVEL DE GPU ADAPTATIVO (gpunivel.h): o quadro que acabou, repartido em
     // ESPERA (clr + swap: o driver devolvendo buffer, a GPU atrasada) e CPU.
     // "Cheia" = artes na tela (o conjunto quente do cache), conferido a cada
@@ -2176,11 +1605,12 @@ int main(int argc, char **argv) {
     Uint64 t0 = NV_T0();
     tex_upl_n = 0; tex_upl_bytes = 0;
     gputempo_quadro_inicio();   // the GPU clock brackets uploads + draw
-    tex_bombear(3);
+    tex_bombear(player_aberto() && player_aberto_ha_ms() < 15000u ? 1 : 3);
     fBomb = NV_DT(t0);
     fUplN = tex_upl_n; fUplB = tex_upl_bytes;
     t0 = NV_T0();
     app_atualizar(dt, agora);
+    double fUpdApp = NV_DT(t0);
     // COR VIVA: UMA vez por quadro, antes do desenho. Consome o pedido que o
     // desenho do quadro anterior fez (corviva_definir) e anda a transicao; o
     // desenho deste quadro so le o resultado (ajustes_acento, NV_COR_FUNDO_*).
@@ -2211,18 +1641,37 @@ int main(int argc, char **argv) {
       // Escuro e sem filme: solta o "manter tela ligada" (so o Android segura
       // fora do player; na LG o app ja o libera sem filme, ver video.c).
       if (esmaecer_mudou_escuro(&escuro)) {
-#ifdef NV_ANDROID
-        if (escuro) SDL_EnableScreenSaver(); else SDL_DisableScreenSaver();
-#endif
         printf("[esmaecer] %s\n", escuro ? "tela quase apagada (estagio 2)" : "acordou");
         fflush(stdout);
       } }
-    ajustes_log_vazar();
-    ajustes_idioma_auto_tick();   // locale da TV (webOS): chega de um fio
-    corviva_quadro(dt, ajustes_cor_viva(), ajustes_cor_logo(),
-                   ajustes_animacoes_reduzidas());
-    ajustes_textura_quadro();   // Textura: a do titulo em cena vai ao gfx
+    // INSTRUMENTACAO DO BLOCO UPD (opt. 2026-11): a pausa de 369 ms
+    // observada e atribuida ao `upd`, que inclui estas sub-etapas. Cada uma
+    // so aparece no log quando custar mais de 20 ms, para nao afogar o log.
+    // Permite separar app_atualizar (logica de tela), ajustes_log_vazar (I/O
+    // de arquivo) e corviva (animacao de cor) sem build instrumentada.
+    { Uint64 tUpd2 = NV_T0(); double ms;
+      ajustes_log_vazar();
+      ms = NV_DT(tUpd2);
+      if (ms > 20.0) { printf("[upd-detalhe] ajustes_log_vazar=%.1f ms\n", ms); fflush(stdout); }
+      tUpd2 = NV_T0();
+      ajustes_idioma_auto_tick();   // locale da TV (webOS): chega de um fio
+      ms = NV_DT(tUpd2);
+      if (ms > 20.0) { printf("[upd-detalhe] ajustes_idioma_auto_tick=%.1f ms\n", ms); fflush(stdout); }
+      tUpd2 = NV_T0();
+      corviva_quadro(dt, ajustes_cor_viva(), ajustes_cor_logo(),
+                     ajustes_animacoes_reduzidas());
+      ms = NV_DT(tUpd2);
+      if (ms > 20.0) { printf("[upd-detalhe] corviva_quadro=%.1f ms\n", ms); fflush(stdout); }
+      tUpd2 = NV_T0();
+      ajustes_textura_quadro();   // Textura: a do titulo em cena vai ao gfx
+      ms = NV_DT(tUpd2);
+      if (ms > 20.0) { printf("[upd-detalhe] ajustes_textura_quadro=%.1f ms\n", ms); fflush(stdout); }
+    }
     fUpd = NV_DT(t0);
+    // Quando o quadro todo de upd pesar, mostra a reparticao interna.
+    // A sub-etapa 'app' e a mais propensa a ser bloqueante (consultas de tela).
+    if (fUpd > 50.0 && rastroQuadros)
+      printf("[upd-detalhe] upd=%.1f app_atualizar=%.1f\n", fUpd, fUpdApp);
 
     // RECORTE DESLIGADO ANTES DO CLEAR. glClear respeita o scissor test: se
     // qualquer tela terminar o quadro com um recorte ativo, o clear seguinte
@@ -2245,13 +1694,16 @@ int main(int argc, char **argv) {
     // gpun_quadro_fim amplia para a janela.
     // Mudou "Efeitos visuais" nos Ajustes: aplica no proximo quadro.
     if (ajustes_gpu_efeitos() != gpuPref) { gpuPref = ajustes_gpu_efeitos(); gpun_preferencia(gpuPref); }
-#ifdef NV_TPK
-    video_tpk_zoom_roi_definir(ajustes_trailer_zoom_tpk());   // #241: Ajustes > Trailers
-#endif
     texto_sistema_mic_modo(ajustes_mic_busca());              // Ajustes > Tela inicial > Barra lateral
-    gpun_ampliar_app(resolucaoDaTv() && ajustes_ampliar_app() &&
-                     (ajustes_720p() || ajustes_1080p()));
+    gpun_ampliar_app(resolucaoDaTv() && (ajustes_ampliar_app() || ajustes_4k()) &&
+                     (ajustes_720p() || ajustes_1080p() || ajustes_4k()));
     gpun_quadro_inicio();
+    // Artwork follows the actual render target, not the 4K presentation surface.
+    // Text keeps its independent density; hero and quality margins remain intact.
+    tex_escala(gfx_px_por_unidade());
+    // Clear overwrites the whole bound target. Use its actual attachment
+    // type, including internal 720p/1080p/HDR targets without app upscaling.
+    gpun_descartar_alvo();
     glClearColor(NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
     if (!nvPrimeiroQuadroFeito) arranque_etapa("primeiro glClear");
     fGlClr = NV_DT(t0);
@@ -2282,7 +1734,9 @@ int main(int argc, char **argv) {
     gif_ocioso();
     gfx_ambiente_descarregar();   // quadro sem desenho por cima: a luz ainda sai
     gpun_ampliacao(ajustes_ampliacao_algo(), ajustes_ampliacao_nitidez());
+    fCena = NV_DT(t0);
     gpun_quadro_fim();
+    fAmplia = NV_DT(t0) - fCena;
     fDes = NV_DT(t0);
     fGfxMs = gfx_ms_rect; fTexMs = tex_ms_busca;
     fNRect = gfx_n_rect; fNProg = gfx_n_prog; fNBind = gfx_n_bind; fNBusca = tex_n_busca;
@@ -2300,51 +1754,14 @@ int main(int argc, char **argv) {
     t0 = NV_T0();
     int playerUi = player_ui_frame(player_aberto(), gfx_n_rect, gfx_n_outros);
     if (playerUi != playerUiPrevious) {
-#if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
       SDL_GL_SetSwapInterval(playerUi ? 0 : 1);
-#endif
       playerUiPrevious = playerUi;
     }
     if (!nvPrimeiroQuadroFeito) arranque_etapa("primeiro SwapWindow");
     SDL_GL_SwapWindow(win);
-#ifndef __EMSCRIPTEN__
     { unsigned wait = player_frame_wait(playerUi, SDL_GetTicks() - frameStarted);
       if (wait) SDL_Delay(wait); }
-#else
-    (void)frameStarted;
-#endif
     swapint_marca(&swapInt, (double)SDL_GetPerformanceCounter() * 1000.0 / perFreq);
-#ifdef NV_ANDROID
-    android_quadro();   // todo quadro apresentado, de qualquer tela (vigia #266)
-#endif
-#ifdef __EMSCRIPTEN__
-    { Uint64 c0 = SDL_GetPerformanceCounter();
-      double c = (double)(c0 - fimCeder) * 1000.0 / perFreq, fora;
-      if (c > cMaxMs) cMaxMs = c;
-#ifdef NV_UM_FIO
-      // GANCHO DO ESCALONADOR DE FIBRAS (--um-fio, ver src/fio1.h). No build
-      // mt/ os ~76 pontos de pthread_create rodam em Workers de verdade,
-      // paralelos ao fio principal o tempo todo. Aqui so ha ESTE fio de JS:
-      // sem chamar fio1_rodar todo quadro, nenhuma fibra de trabalho (busca,
-      // fontes, streams, etc.) jamais receberia CPU. 6 ms e um orcamento, nao
-      // uma garantia — cede mais cedo se a fila de prontas esvaziar antes
-      // disso. NAO MEDIDO NA TV: e um chute a partir do orcamento de quadro a
-      // 60 fps (16,7 ms) menos o que o desenho normal ja consome; se os fios
-      // de trabalho ficarem famintos (busca/streams lentos demais), este
-      // numero e o primeiro a subir — e se o proprio desenho comecar a
-      // atrasar, e o primeiro a descer.
-      fio1_rodar(6.0);
-#endif
-      nv_ceder_quadro(playerUi);
-      fimCeder = SDL_GetPerformanceCounter();
-      fora = (double)(fimCeder - c0) * 1000.0 / perFreq;
-      if (fora > foraMaxMs) foraMaxMs = fora; }
-    // Oferece ao IDBFS a chance de descarregar. Quase todo quadro isso e a
-    // leitura de duas bandeiras e um return: quem decide SE e quando descarregar
-    // e a politica em dados.c, porque descarregar a cada escrita era o que
-    // produzia os picos de 100 ms.
-    dados_sincronizar();
-#endif
     fSwap = NV_DT(t0);
     // PRIMEIRO PIXEL. E o numero que responde "quanto tempo ate a TV mostrar
     // alguma coisa", que nenhuma metrica de quadro dava.
@@ -2354,10 +1771,6 @@ int main(int argc, char **argv) {
     { static int jaCarimbou;
       if (!jaCarimbou) { jaCarimbou = 1; nvPrimeiroQuadroFeito = 1; arranque_etapa("quadro-1"); marco("primeiro quadro na tela");
         NV_ETAPA("pronto");
-#ifdef __EMSCRIPTEN__
-        // Chegou: zera o contador de arranques falhados (tizen-shell.html).
-        EM_ASM({ try { localStorage.setItem('nv-boot-falhas', '0'); } catch (e) {} });
-#endif
       } }
     quadros++;
 
@@ -2367,9 +1780,7 @@ int main(int argc, char **argv) {
       memlog_amostra(memoria, sizeof memoria);
       // webOS has no Android trim callback: use the existing /proc threshold.
       if (player_retido() && memlog_pouca_memoria()) player_ciclo_evento(SDL_APP_LOWMEMORY);
-#ifndef NV_ANDROID
       tex_memoria_livre(memlog_livre_mb());   // #415; Android usa o trim
-#endif
       NvCacheArteStats cacheArteStats;
       tex_estatisticas(&itens, &pend, &bytes, &quentes, &bytesQ);
       memset(&cacheArteStats, 0, sizeof cacheArteStats);
@@ -2410,11 +1821,7 @@ int main(int argc, char **argv) {
              cacheArteStats.hits, cacheArteStats.misses, cacheArteStats.gravacoes, cacheArteStats.falhas,
              cacheArteStats.essenciais, cacheArteStats.essenciais_esperados,
              dados_persistente() ? "on" : "off",
-#ifdef __EMSCRIPTEN__
-             dados_persistente() ? "mounted" : "unmounted",
-#else
              "native",
-#endif
              dados_sync_pendente() ? "pending" : (dados_sync_em_recuo() ? "retry" : "idle"),
              dados_sync_sucessos, dados_sync_falhas, dados_sync_pendente(),
              dados_desc_n, dados_desc_ms, dados_modo_recuperacao(),
@@ -2431,42 +1838,6 @@ int main(int argc, char **argv) {
       corviva_gravar_se_preciso(0);          // corviva.txt: no maximo 1 a cada 20 s
       dados_sync_sucessos = 0;
       dados_sync_falhas = 0;
-#ifdef __EMSCRIPTEN__
-      // Heap linear, nao RAM total do processo: GPU e memoria JS ficam fora.
-      // uordblks inclui pilhas dos pthreads e dados alocados pelo malloc.
-      { struct mallinfo mi = mallinfo();
-        printf("[mem] WASM=%.1f MiB malloc=%.1f MiB livre-no-heap=%.1f MiB\n",
-               emscripten_get_heap_size() / 1048576.0,
-               mi.uordblks / 1048576.0, mi.fordblks / 1048576.0); }
-      // O NAVEGADOR, visto de fora do WASM (20/09/2026, #72, registros 10 e
-      // 11): `swap` de 3-11 s com pend=0 e `[hero] app parado` por 27 s
-      // dizem que o fio principal ficou fora do nosso codigo — mas nao se
-      // foi o runtime da TV que parou ou se e algo que ainda fazemos. Isto
-      // separa: heap JS (performance.memory), o maior buraco entre dois rAF
-      // medidos por um laco JS proprio (tizen-shell.html), quantos passaram
-      // de 500 ms, e se a pagina esteve escondida.
-      { int jsMB = 0, jsLimMB = 0, rafMax = 0, rafLentos = 0, escondida = 0;
-        jsMB = EM_ASM_INT({ try { return (performance.memory.usedJSHeapSize / 1048576) | 0; } catch (e) { return -1; } });
-        jsLimMB = EM_ASM_INT({ try { return (performance.memory.jsHeapSizeLimit / 1048576) | 0; } catch (e) { return -1; } });
-        rafMax = EM_ASM_INT({ var r = window.__nvRaf; if (!r) return -1; var m = r.max | 0; r.max = 0; return m; });
-        rafLentos = EM_ASM_INT({ var r = window.__nvRaf; if (!r) return -1; var n = r.lentos | 0; r.lentos = 0; return n; });
-        escondida = EM_ASM_INT({ return document.hidden ? 1 : 0; });
-        { static char quem[64];
-          int longMax, longN, longSoma;
-          longMax  = EM_ASM_INT({ var L = window.__nvLong; return L ? (L.max | 0) : -1; });
-          longN    = EM_ASM_INT({ var L = window.__nvLong; return L ? (L.n | 0) : -1; });
-          longSoma = EM_ASM_INT({ var L = window.__nvLong; return L ? (L.soma | 0) : -1; });
-          EM_ASM({ var L = window.__nvLong; if (!L) return;
-                   var q = (L.quem || "-") + "@" + (L.fase || "?"); var i = 0;
-                   for (; i < q.length && i < 62; i++) HEAPU8[$0 + i] = q.charCodeAt(i) & 127;
-                   HEAPU8[$0 + i] = 0;
-                   L.max = 0; L.n = 0; L.soma = 0; L.quem = ""; L.fase = ""; }, quem);
-          printf("[navegador] js=%d/%d MiB raf-max=%d ms raf-lentos=%d escondida=%d"
-                 " longtask-max=%d ms n=%d soma=%d ms quem=%s c-max=%d ms fora-max=%d ms\n",
-                 jsMB, jsLimMB, rafMax, rafLentos, escondida, longMax, longN, longSoma, quem,
-                 (int)cMaxMs, (int)foraMaxMs);
-          cMaxMs = 0; foraMaxMs = 0; } }
-#endif
       // A REPARTICAO DO PIOR QUADRO, NA TELA E NAO SO NO ARQUIVO.
       //
       // Ela ja existia, mas so em /tmp/nuvio-fps.txt — e quem relata desempenho
@@ -2535,6 +1906,7 @@ int main(int argc, char **argv) {
                " upd=%.1f clr=%.1f des=%.1f aux=%.1f swap=%.1f tela=%s trans=%s\n",
                pior, pEv, pBomb, pUplN, pUplB / 1048576.0,
                pUpd, pClr, pDes, pAux, pSwap, pTela, pTrans);
+        printf("[quadro-cena] desenho=%.1fms ampliacao=%.1fms\n", pCena, pAmplia);
         // 2.0.1: `clr` de 6 e 14 s no Android ao abrir video (Expressluck, TCL
         // A14) e o numero junta seis passos. Aberto em partes so quando pesa:
         // prep = luz ambiente + vidro fosco, gl = o glClear (primeira chamada
@@ -2555,20 +1927,10 @@ int main(int argc, char **argv) {
       // Instrumento de campo (gfx.h, gfx_modos_desligados): a lista em
       // /tmp/nuvio-gfx-off desliga modos de desenho; e o preenchimento do
       // ultimo quadro por modo, para saber quem pesa sem recompilar.
-      { FILE *fq = fopen("/tmp/nuvio-quadros", "r"); rastroQuadros = fq != NULL; if (fq) fclose(fq); }
-      { FILE *fo = fopen("/tmp/nuvio-gfx-off", "r");
+      { FILE *fq = fopen("/tmp/" NV_APP_ID "-quadros", "r"); rastroQuadros = fq != NULL; if (fq) fclose(fq); }
+      { FILE *fo = fopen("/tmp/" NV_APP_ID "-gfx-off", "r");
         unsigned long long m = 0; int n;
         if (fo) { while (fscanf(fo, "%d", &n) == 1) if (n >= 0 && n < GFX_NMODOS) m |= 1ull << n; fclose(fo); }
-#ifdef NV_ANDROID
-        // No Android nao ha /tmp: `adb shell setprop debug.nuvio.gfxoff "33 1"`
-        // faz o mesmo (lista de modos, separados por espaco; "" religa).
-        { char pv[PROP_VALUE_MAX] = "";
-          if (__system_property_get("debug.nuvio.gfxoff", pv) > 0) {
-            const char *q = pv;
-            while (*q) { char *fim; long v = strtol(q, &fim, 10); if (fim == q) break;
-                         if (v >= 0 && v < GFX_NMODOS) m |= 1ull << v; q = fim; }
-          } }
-#endif
         if (m != gfx_modos_desligados) { printf("[gpu-modos] desligados=%llx\n", m); gfx_modos_desligados = m; }
         // Field instruments on Android, where there is no /tmp (all read once per
         // 3 s report, all no-ops when the property is unset or "0"):
@@ -2577,16 +1939,6 @@ int main(int argc, char **argv) {
         //   debug.nuvio.gpunivel N -> force GPU level N (0-3) for A/B measurement
         //   debug.nuvio.gputempo 1 -> GPU timer per frame (read at startup, gputempo.c)
         int forcaFill = 0;
-#ifdef NV_ANDROID
-        { char pv[PROP_VALUE_MAX] = "";
-          if (__system_property_get("debug.nuvio.quadros", pv) > 0 && pv[0] && pv[0] != '0') rastroQuadros = 1;
-          pv[0] = 0;
-          forcaFill = __system_property_get("debug.nuvio.fill", pv) > 0 && pv[0] && pv[0] != '0';
-          pv[0] = 0;
-          if (__system_property_get("debug.nuvio.gpunivel", pv) > 0 && pv[0] >= '0' && pv[0] <= '3' &&
-              pv[0] - '0' != gpun_nivel())
-            gpun_definir_nivel(pv[0] - '0'); }
-#endif
         // NO CAMPO, SEM ARQUIVO: interface lenta (FPS < 50 com mais de 9
         // texturas na tela) solta a mesma linha, no maximo uma vez a cada 30 s,
         // com layout, tema e vidro. Registros 10063-10235 (LG webOS 5): 60 fps
@@ -2594,7 +1946,7 @@ int main(int argc, char **argv) {
         // que desenho pesava.
         static Uint32 ultModos;
         double fpsAgora = quadros * 1000.0 / (double)(agora - ultRelato);
-#if defined(NV_TPK) || defined(NV_ANDROID) || defined(NV_WEBOS)
+#if defined(NV_WEBOS)
         gpun_relatar(fpsAgora, pior, gpuRelatoPeriodo,
                      gpuRelatoMisto ? 0 : gpuRelatoCena, gpuRelatoCheia);
         gpuRelatoMisto = 0;
@@ -2624,20 +1976,13 @@ int main(int argc, char **argv) {
                  gpuFillN ? gpuFillSoma / gpuFillN : 0.0, gpuFillPico);
         }
         gpuFillSoma = 0.0; gpuFillPico = 0.0; gpuFillN = 0; }
-#ifdef NV_TPK
-      // Quanto de tela o pior quadro pintou (gfx_fill, em telas 1920x1080) e
-      // em que nivel de GPU (gpunivel.h): e o que separa "a GPU nao da conta
-      // deste quadro" de "este quadro pinta mais que o normal".
-      printf("[gpu] nivel=%d fill-pior=%.2fx cheias=%d rects=%d\n",
-             gpun_nivel(), pFill, pNCheio, pNRect);
-#endif
       fflush(stdout);
       // A MESMA linha vai para um arquivo. No aparelho a saida padrao do app
       // lancado pelo applicationManager nao chega a lugar nenhum que se possa
       // ler, e rodar o binario a mao nao funciona (sem a identidade do app o
       // compositor recusa a superficie e ele morre em silencio). Sem isto nao
       // ha como MEDIR quadro no aparelho — so olhar e achar.
-      { FILE *fp = fopen("/tmp/nuvio-fps.txt", "w");
+      { FILE *fp = fopen("/tmp/" NV_APP_ID "-fps.txt", "w");
         if (fp) {
           fprintf(fp, "drawable=%dx%d FPS=%.1f pior=%.1fms janks=%d"
                   " texto=%.1fms/%d texturas=%d %.1fMB"
@@ -2687,30 +2032,6 @@ int main(int argc, char **argv) {
 #ifdef NV_SINAL_TERMINAR
   alarm(0);   // a saida normal terminou: nada de SIGALRM depois dela
 #endif
-#ifdef __EMSCRIPTEN__
-  // O SDL_Quit apaga TODOS os hints (SDL_ClearHints, SDL.c do port 2.32.10),
-  // inclusive o de ASYNCIFY acima — e os fios de trabalho continuam vivos
-  // ate a pagina fechar. O primeiro SDL_Delay de um deles depois disto via
-  // emscripten_sleep e abortava: "Aborted(invalid state: 1)" logo depois do
-  // "fim" em todo log de saida da Samsung 1.5.0. Repor o hint aqui fecha isso.
-  SDL_SetHint(SDL_HINT_EMSCRIPTEN_ASYNCIFY, "0");
-#endif
   printf("fim\n");
-#ifdef __EMSCRIPTEN__
-  // SAIR DE VERDADE NO TIZEN. Aqui o laco de quadro acabou e o main devolve,
-  // mas com EXIT_RUNTIME=0 a pagina CONTINUA no ar — com o canvas parado no
-  // ultimo quadro e nada respondendo. Do sofa isso e indistinguivel de um
-  // travamento, e era literalmente o relato: "no Tizen, Voltar na home trava;
-  // na LG fecha o aplicativo".
-  //
-  // O .wgt fecha pela API do proprio Tizen. Fora dela (Chrome de bancada) o
-  // objeto nao existe, e o catch deixa a pagina como estava — que la e o
-  // comportamento util.
-  //
-  // E NAO NA HORA (issue #120): o que app_encerrar gravou ou apagou (a marca de
-  // sessao viva, os avisos vistos) ainda esta so no MEMFS. dados.c descarrega
-  // para o IndexedDB e fecha no callback.
-  dados_descarregar_e_sair();
-#endif
   return 0;
 }

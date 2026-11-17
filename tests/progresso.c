@@ -12,10 +12,11 @@
 // ---- dublês ----------------------------------------------------------------
 static char *arquivo;          // conteudo de progresso.txt, ou NULL
 static int   perfil = 1;
+static int gravacoes, falhar;
 static long long agora = 1757000000000LL;
 
 char *dados_ler(const char *nome) { (void)nome; return arquivo ? strdup(arquivo) : NULL; }
-int   dados_gravar(const char *nome, const char *c) { (void)nome; free(arquivo); arquivo = strdup(c); return 1; }
+int   dados_gravar(const char *nome, const char *c) { (void)nome; gravacoes++; if (falhar) return 0; free(arquivo); arquivo = strdup(c); return 1; }
 int   dados_apagar(const char *nome) { (void)nome; free(arquivo); arquivo = NULL; return 1; }
 int   perfis_ativo(void) { return perfil; }
 static long long relogio(void) { return agora; }
@@ -271,8 +272,32 @@ static void limiteEscolheOsMaisNovos(void) {
   puts("ok  leitura limitada inclui os mais novos antes de truncar");
 }
 
+static void loteAtomico(void) {
+  ProgRegistro r[3] = {{0}};
+  unsigned char aceitou[3];
+  zerar(NULL); perfil = 1;
+  for (int i = 0; i < 3; i++) {
+    snprintf(r[i].contentId, sizeof r[i].contentId, "tt%d", 100 + i);
+    r[i].durSeg = 600; r[i].posSeg = 100; r[i].lastWatchedMs = agora;
+  }
+  gravacoes = 0;
+  assert(prog_aplicar_remotos(r, 3, aceitou) == 3);
+  assert(gravacoes == 1 && aceitou[0] && aceitou[1] && aceitou[2]);
+  assert(prog_aplicar_remotos(r, 3, aceitou) == 0 && gravacoes == 1);
+  r[0].lastWatchedMs++; r[0].posSeg = 200;
+  falhar = 1;
+  assert(prog_aplicar_remotos(r, 3, aceitou) == 0 && !aceitou[0]);
+  assert(porChave("tt100")->posSeg == 100);
+  falhar = 0;
+  assert(prog_aplicar_remotos(r, 3, aceitou) == 1 && aceitou[0] && !aceitou[1]);
+  prog_invalidar(); assert(porChave("tt100")->posSeg == 200);
+  assert(prog_aplicar_remotos(NULL, 0, NULL) == 0);
+  puts("ok  lote duravel unico, sem regravar repetidos, rollback e retry");
+}
+
 int main(void) {
   prog_definir_relogio(relogio);
+  loteAtomico();
   chaveIgualAoWeb();
   migraFormatoAntigo();
   gravarLocalEhPendenteComHora();

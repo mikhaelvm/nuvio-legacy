@@ -1,4 +1,5 @@
 #include "gfx.h"
+#include "shadercache.h"
 #include "tex_cache.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -143,9 +144,6 @@ static double fillGpuArea(GfxRect r, const float sub[4]) {
 float gfx_px_por_unidade(void) { return (float)telaRealW / NV_TELA_W; }
 void gfx_tamanho_alvo(int w, int h) {
   telaW = w; telaH = h; telaRealW = w; telaRealH = h;
-#ifdef NV_TOUCH_UI
-  uTelaW = NV_TELA_W; uTelaH = NV_TELA_H;
-#endif
 }
 void gfx_tamanho_tela(int *w, int *h) { *w = telaRealW; *h = telaRealH; }
 // Tamanho da interface (gfx.h). escAtiva multiplica o retangulo de layout
@@ -1763,20 +1761,29 @@ static GLuint compila(GLenum tipo, const char *src) {
 // quem desligou o vidro (o padrao) nunca o desenha.
 static GLuint vsProg;
 static int progMontar(int m) {
-  GLuint vs = vsProg;
   char fonte[12000];   // cabeca + sdf/cover + corpo; o maior (camadas) passa de 6000
   snprintf(fonte, sizeof fonte, "%s%s%s%s%s",
            FS_CABECA, m == GFX_CARD_HERO ? "#define HERO_CARD\n" : "",
            PRECISA[m].sdf ? FS_SDF : "", PRECISA[m].cover ? FS_COVER : "",
            FS_CORPO[m == GFX_CARD_HERO ? GFX_CARD : m]);
   GLuint p = glCreateProgram();
-  glAttachShader(p, vs);
-  glAttachShader(p, compila(GL_FRAGMENT_SHADER, fonte));
-  glBindAttribLocation(p, 0, "aPos");
-  glLinkProgram(p);
-  GLint ok = 0; glGetProgramiv(p, GL_LINK_STATUS, &ok);
-  if (!ok) { char log[700]; glGetProgramInfoLog(p, 700, NULL, log);
-             printf("gfx link modo %d: %s\n", m, log); return 0; }
+  uint64_t chave = shadercache_chave(VS, fonte);
+  if (!shadercache_ler(p, m, chave)) {
+    if (!vsProg) vsProg = compila(GL_VERTEX_SHADER, VS);
+    GLuint fs = compila(GL_FRAGMENT_SHADER, fonte);
+    glAttachShader(p, vsProg);
+    glAttachShader(p, fs);
+    glBindAttribLocation(p, 0, "aPos");
+    glLinkProgram(p);
+    GLint ok = 0; glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    glDetachShader(p, fs); glDeleteShader(fs);
+    glDetachShader(p, vsProg);
+    if (!ok) {
+      char log[700]; glGetProgramInfoLog(p, 700, NULL, log);
+      printf("gfx link modo %d: %s\n", m, log); glDeleteProgram(p); return 0;
+    }
+    shadercache_gravar(p, m, chave);
+  }
   progs[m].prog = p;
   progs[m].rect = glGetUniformLocation(p, "uRect");
   progs[m].tela = glGetUniformLocation(p, "uTela");
@@ -1843,15 +1850,16 @@ static int progMontar(int m) {
 }
 
 int gfx_iniciar(void) {
-  vsProg = compila(GL_VERTEX_SHADER, VS);
+  vsProg = 0;
+  shadercache_iniciar();
   // Capturas (tests/*_shot): NUVIO_TAMANHO_UI=1.2 liga o "Tamanho da
   // interface" sem passar por Ajustes. No app quem define e ajustes.c.
   { const char *t = getenv("NUVIO_TAMANHO_UI"); if (t && *t) { gfx_escala_ui_definir((float)atof(t)); escUiFixa = 1; } }
   for (int m = 0; m < GFX_NMODOS; m++) {
-    if (m == GFX_VIDRO || m >= GFX_COPIA_EASU) continue;   // sob demanda   // sob demanda: progMontar em gfx_rect
     if (m == GFX_VIDRO || m >= GFX_COPIA_EASU) continue;   // sob demanda: progMontar em gfx_rect
     if (!progMontar(m)) return 0;
   }
+  shadercache_relatar();
   glUseProgram(progs[GFX_CARD].prog);
   progAtual = GFX_CARD;
 
@@ -1896,6 +1904,7 @@ static void desfEncerrar(void);
 static void iconesEncerrar(void);
 static void vidLiberar(void);
 void gfx_encerrar(void) {
+  if (vsProg) { glDeleteShader(vsProg); vsProg = 0; }
   gfx_mini_liberar(&warmAlvo);
   iconesEncerrar();
   desfEncerrar();
@@ -2641,7 +2650,7 @@ void gfx_rect(GfxRect r, GLuint tex, GfxModo modo, float foco,
   vidroDesenho(r, tex, modo, foco, parx, pary, raio, cr, cg, cb, ca);
   { float area = (r.w * r.h) / (NV_TELA_W * NV_TELA_H) *
                  (subAtual[2] - subAtual[0]) * (subAtual[3] - subAtual[1]);
-    if (gfx_rastro_grandes && (area >= 0.12f || (modo == GFX_COR && area >= 0.01f)))
+    if (gfx_rastro_grandes && (area >= 0.04f || (modo == GFX_COR && area >= 0.01f)))
       printf("[qd-rect] modo=%d %.0fx%.0f@%.0f,%.0f a=%.2f raio=%.0f tex=%u\n", (int)modo, r.w, r.h, r.x, r.y,
              ca * gfx_opacidade_grupo, raio, (unsigned)tex);
     gfx_fill += area;
@@ -3178,18 +3187,8 @@ void gfx_fundo_din_desenhar(const float topo[3], float queda) {
     // Dinamica) e consertou com a teste-318.1 do mesmo jeito; o que foi
     // desligado de vez foram o descarte (gpunivel.c) e o gputempo.
     if (dinAdiadoOk < 0) {
-#ifdef NV_ANDROID
-      GLint fboAnt = fboLigado(), bitsA = 0;
-      if (fboAnt) glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glGetIntegerv(GL_ALPHA_BITS, &bitsA);
-      if (fboAnt) glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)fboAnt);
-      dinAdiadoOk = bitsA >= 8;
-      printf("[fundo-din] adiado para o fim do quadro: %s (alfa da janela %d bits)\n",
-             dinAdiadoOk ? "sim" : "nao", (int)bitsA);
-#else
       dinAdiadoOk = 0;
       printf("[fundo-din] adiado para o fim do quadro: nao\n");
-#endif
     }
     dinAdiado = dinAdiadoOk && gfx_n_rect == 0 && !gfx_modos_desligados;
     if (dinAdiado) {
@@ -4705,9 +4704,6 @@ void gfx_snap_desenhar(void) {
 }
 
 void gfx_snap_encerrar(void) {
-#ifdef NV_TOUCH_UI
-  snapGeracao++;
-#endif
   if (snapFbo) glDeleteFramebuffers(1, &snapFbo);
   if (snapTex) glDeleteTextures(1, &snapTex);
   snapFbo = snapTex = 0;

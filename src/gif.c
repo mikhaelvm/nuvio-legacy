@@ -9,37 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
 #ifdef NV_WEBP_ANIM
 #include <webp/demux.h>
 #endif
 // .tpk da Samsung: o mesmo decodificador C do Tizen web (1.4.7), sem o
 // navegador — relogio por clock_gettime e RAM pelo /proc/meminfo.
-#if defined(__EMSCRIPTEN__) || defined(NV_TPK) || defined(NV_ANDROID)
-#define NV_GIF_ANIMA 1
-#endif
-#if defined(NV_TPK) || defined(NV_ANDROID)
-static double emscripten_get_now(void) {
-  struct timespec t;
-  clock_gettime(CLOCK_MONOTONIC, &t);
-  return t.tv_sec * 1000.0 + t.tv_nsec / 1e6;
-}
-// Mesma pergunta do navigator.deviceMemory, em GB: MemTotal.
-static double gif_js_memoria_gb(void) {
-  FILE *f = fopen("/proc/meminfo", "r");
-  char l[128];
-  double gb = 0;
-  if (!f) return 0;
-  while (fgets(l, sizeof l, f)) {
-    unsigned long kb;
-    if (sscanf(l, "MemTotal: %lu kB", &kb) == 1) { gb = kb / (1024.0 * 1024.0); break; }
-  }
-  fclose(f);
-  return gb;
-}
-#endif
 
 // ---------------------------------------------------------------- estrutura
 //
@@ -168,14 +142,6 @@ double gif_estica(size_t custo, size_t orc) {
 }
 
 #ifdef NV_GIF_ANIMA
-#ifdef __EMSCRIPTEN__
-EM_JS(double, gif_js_memoria_gb, (), {
-  try {
-    var m = (typeof navigator !== 'undefined') ? navigator.deviceMemory : 0;
-    return (typeof m === 'number' && m > 0) ? m : 0;
-  } catch (e) { return 0; }
-});
-#endif
 
 // Decidido uma vez: a RAM nao muda com o app aberto.
 static size_t orcamento(void) {
@@ -981,12 +947,6 @@ static void abrir(const char *caminho, int largAlvo) {
     telaW = b[6] | (b[7] << 8);
     telaH = b[8] | (b[9] << 8);
   }
-#ifdef NV_ANDROID
-  /* Low-RAM TVs keep the same first-frame artwork without an animation worker. */
-  if (gif_js_memoria_gb() < 3.0) {
-    free(b); recusado = 1; return;
-  }
-#endif
   gif_tamanho_saida(telaW, telaH, largAlvo, &fioW, &fioH);
   fio = gif_fio_abrir(b, n, fioW, fioH);      // dono de `b` daqui em diante
   if (!fio) {

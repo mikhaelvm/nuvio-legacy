@@ -17,7 +17,6 @@ __attribute__((weak)) int arte_reserva_registrar(const char *url, const char *im
 // sessao.h e perfis.h dizem DE QUEM e o que esta gravado. Ver a nota longa
 // sobre caminhoCache mais abaixo.
 #include "dados.h"
-#include "androidcache.h"
 #include "sessao.h"
 #include "perfis.h"
 #include "perfisessao.h"
@@ -926,9 +925,6 @@ static void caminhoCachePerfil(char *dst, size_t tam, const char *usuario, int p
 // src/dados.h) — nesse caso volta-se ao comportamento de sempre.
 static void caminhoCache(const char *dirArte, char *dst, size_t tam) {
   const char *d = dados_dir();
-#ifdef NV_ANDROID
-  d = nv_android_cache_dir();
-#endif
   if (!d || !*d) d = (dirArte && *dirArte) ? dirArte
                                            : (dirCache[0] ? dirCache : ".");
   if (d != dirCache) snprintf(dirCache, sizeof dirCache, "%s", d);
@@ -972,15 +968,9 @@ static void caminhoCache(const char *dirArte, char *dst, size_t tam) {
 //
 // Fora do Emscripten as tres sao no-op dentro de dados.c; mante-las fora do
 // build nativo evita arrastar dados.c para testes que so querem o catalogo.
-#ifdef __EMSCRIPTEN__
-#define CACHE_FS_TRAVAR()   dados_fs_travar()
-#define CACHE_FS_LIBERAR()  dados_fs_liberar()
-#define CACHE_MARCAR_SUJO() dados_marcar_sujo(0)
-#else
 #define CACHE_FS_TRAVAR()   ((void)0)
 #define CACHE_FS_LIBERAR()  ((void)0)
 #define CACHE_MARCAR_SUJO() ((void)0)
-#endif
 
 static int cacheApagarTemporarios(const char *prefixo) {
   DIR *dir = opendir(dirCache);

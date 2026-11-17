@@ -57,7 +57,7 @@ int main(void) {
   mtx = SDL_CreateMutex(); cond = SDL_CreateCond();
   condDec = SDL_CreateCond(); condLivre = SDL_CreateCond();
   const long ram[] = {650, 1500, 2400, 4096};
-  for (int platform = PTV_LG; platform <= PTV_ANDROID; platform++)
+  for (int platform = PTV_LG; platform <= PTV_LG; platform++)
     for (int cls = 0; cls < 4; cls++) {
       testPlatform = platform;
       memset(itens, 0, sizeof itens); bytesUsados = 0; quadroAtual = 100;

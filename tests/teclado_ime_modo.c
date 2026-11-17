@@ -18,7 +18,7 @@ static void modo(int v) {
   FILE *f = fopen(caminho, "w"); assert(f);
   fprintf(f, "tecladoAndroidLocal %d\n", v); fclose(f);
   ajustes_dir(dir);
-  assert(ajustes_teclado_android() == v);
+  assert(ajustes_teclado_modo() == v);
 }
 static int imeAberto(void) { return st_estado() == ST_DIGITANDO && st_dono() == ST_TECLADO; }
 static void abrir(int tipo) {

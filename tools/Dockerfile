@@ -11,14 +11,17 @@
 # gerado, e sem relocar o gcc nao acha o proprio sysroot.
 FROM debian:bookworm-slim
 
-ARG SDK_URL=https://github.com/openlgtv/buildroot-nc4/releases/download/webos-a38c582/arm-webos-linux-gnueabi_sdk-buildroot-aarch64.tar.gz
+ARG TARGETARCH
+ARG SDK_URL
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl file xz-utils \
      autoconf automake libtool make gcc g++ meson ninja-build pkg-config python3 \
   && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL "$SDK_URL" -o /tmp/sdk.tar.gz \
+RUN case "$TARGETARCH" in amd64) SDK_HOST=x86_64 ;; arm64) SDK_HOST=aarch64 ;; *) echo "Unsupported SDK host: $TARGETARCH" >&2; exit 2 ;; esac \
+  && SDK_SOURCE="${SDK_URL:-https://github.com/openlgtv/buildroot-nc4/releases/download/webos-a38c582/arm-webos-linux-gnueabi_sdk-buildroot-$SDK_HOST.tar.gz}" \
+  && curl -fsSL "$SDK_SOURCE" -o /tmp/sdk.tar.gz \
   && mkdir -p /opt \
   && tar -xzf /tmp/sdk.tar.gz -C /opt \
   && rm /tmp/sdk.tar.gz \
@@ -31,7 +34,8 @@ ENV NUVIO_SYSROOT=/opt/arm-webos-linux-gnueabi_sdk-buildroot/arm-webos-linux-gnu
 # texto entram estaticos no prefixo da imagem e sao ligados pelo tools/arm.sh.
 ENV NUVIO_ASS_ROOT=/opt/nuvio-ass
 COPY build-ass-arm.sh /tmp/build-ass-arm.sh
-RUN chmod +x /tmp/build-ass-arm.sh \
+RUN sed -i 's/\r$//' /tmp/build-ass-arm.sh \
+  && chmod +x /tmp/build-ass-arm.sh \
   && CC=arm-webos-linux-gnueabi-gcc NUVIO_SYSROOT="$NUVIO_SYSROOT" \
      NUVIO_ASS_ROOT="$NUVIO_ASS_ROOT" /tmp/build-ass-arm.sh \
   && rm -f /tmp/build-ass-arm.sh
@@ -42,6 +46,7 @@ ARG NUVIO_DTS_FFMPEG=1
 ENV NUVIO_DTS_ROOT=/opt/nuvio-dts
 COPY build-dts-ffmpeg.sh /tmp/build-dts-ffmpeg.sh
 RUN if [ "$NUVIO_DTS_FFMPEG" = 1 ]; then \
+      sed -i 's/\r$//' /tmp/build-dts-ffmpeg.sh; \
       CC=arm-webos-linux-gnueabi-gcc /bin/sh /tmp/build-dts-ffmpeg.sh; \
     fi \
   && rm -f /tmp/build-dts-ffmpeg.sh

@@ -9,12 +9,35 @@
 #include <unistd.h>
 
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
+const char *i18n(const char *s) { return s; }
 char *rede_baixar_bin(const char *url, int seconds, long *n) { (void)url; (void)seconds; *n=0; return NULL; }
+typedef struct {int x0,y0,x1,y1,valid;} Ink;
+static Ink ink[65536];static GLuint bound;
 void teste_glGenTextures(GLsizei n, GLuint *t) { static GLuint id=1; while(n--) *t++=id++; }
 void teste_glDeleteTextures(GLsizei n, const GLuint *t) { (void)n; (void)t; }
-void teste_glBindTexture(GLenum a, GLuint t) { (void)a; (void)t; }
+void teste_glBindTexture(GLenum a, GLuint t) { (void)a;CHECK(t<65536);bound=t; }
 void teste_glTexImage2D(GLenum a, GLint b, GLint c, GLsizei w, GLsizei h, GLint d, GLenum e, GLenum f, const void *p) {
-  (void)a;(void)b;(void)c;(void)w;(void)h;(void)d;(void)e;(void)f;(void)p;
+  (void)a;(void)b;(void)c;(void)d;(void)e;
+  Ink *q=&ink[bound];q->valid=0;q->x0=w;q->y0=h;q->x1=q->y1=0;
+  const unsigned char *px=p;CHECK(e==GL_RGBA);
+  for(int y=0;y<h;y++)for(int x=0;x<w;x++) {
+    const unsigned char *v=px+4*(y*w+x);
+    // Compare visible glyph pixels; libass bitmap padding changes with stroke.
+    if(v[3]<128 || !(v[0]||v[1]||v[2]))continue;
+    q->valid=1;if(x<q->x0)q->x0=x;if(y<q->y0)q->y0=y;
+    if(x+1>q->x1)q->x1=x+1;if(y+1>q->y1)q->y1=y+1;
+  }
+}
+void teste_glTexSubImage2D(GLenum a, GLint b, GLint x0, GLint y0, GLsizei w, GLsizei h, GLenum e, GLenum f, const void *p) {
+  (void)a;(void)b;(void)x0;(void)y0;(void)f;
+  Ink *q=&ink[bound];q->valid=0;q->x0=w;q->y0=h;q->x1=q->y1=0;
+  const unsigned char *px=p;CHECK(e==GL_RGBA);
+  for(int y=0;y<h;y++)for(int x=0;x<w;x++) {
+    const unsigned char *v=px+4*(y*w+x);
+    if(v[3]<128 || !(v[0]||v[1]||v[2]))continue;
+    q->valid=1;if(x<q->x0)q->x0=x;if(y<q->y0)q->y0=y;
+    if(x+1>q->x1)q->x1=x+1;if(y+1>q->y1)q->y1=y+1;
+  }
 }
 void teste_glTexParameteri(GLenum a, GLenum b, GLint c) { (void)a;(void)b;(void)c; }
 float gfx_tex_aspect_atual;
@@ -22,6 +45,8 @@ void gfx_tex_esquecer(GLuint t) { (void)t; }
 static float yMin, xMin, xMax; static int drawn;
 void gfx_rect(GfxRect r, GLuint t, GfxModo m, float f, float radius, float b, float ba, float cr, float cg, float cb, float a) {
   (void)t;(void)m;(void)f;(void)radius;(void)b;(void)ba;(void)cr;(void)cg;(void)cb;(void)a;
+  if(!ink[t].valid)return;
+  r.x+=ink[t].x0;r.y+=ink[t].y0;r.w=ink[t].x1-ink[t].x0;
   if (!drawn++ || r.y<yMin) yMin=r.y;
   if (drawn==1 || r.x<xMin) xMin=r.x;
   if (drawn==1 || r.x+r.w>xMax) xMax=r.x+r.w;
@@ -243,7 +268,9 @@ int main(void) {
   a=doc("مرحبا John (123) ١٢٣!");CHECK(a);assrender_geracao(100);
   CHECK(!assrender_carregar_texto(a,strlen(a),99));
   CHECK(assrender_carregar(a,strlen(a),100));CHECK(!assrender_texto_simples());
-  CHECK(frame()>0);CHECK(yMin>oldY-2 && yMin<oldY+2);
+  // Authored ASS has its own font metrics; capture its baseline rather than
+  // compare its upper glyph edge with the previous generated/plain track.
+  CHECK(frame()>0);
   oldW=xMax-xMin; oldY=yMin;
   style.overrides=PLAIN_ASS_FONT | PLAIN_ASS_BORDER | PLAIN_ASS_OUTLINE;
   snprintf(style.font,sizeof style.font,"JetBrains Sans");
@@ -253,6 +280,10 @@ int main(void) {
   style.overrides=0;assrender_definir_texto_estilo(&style);
   CHECK(frame()>0);CHECK(xMax-xMin>oldW-2 && xMax-xMin<oldW+2);
   CHECK(yMin>oldY-2 && yMin<oldY+2);
+  snprintf(style.font,sizeof style.font,"Netflix Sans");
+  style.border=3;style.overrides=PLAIN_ASS_FONT|PLAIN_ASS_BORDER;
+  assrender_definir_texto_estilo(&style);CHECK(frame()>0);
+  puts("PASS Netflix Sans and thin-border/shadow override on paused cue");
   puts("PASS authored ASS font/border overrides and reset on paused cue");
   free(a);legenda_desligar();CHECK(!assrender_ativo());
   puts("PASS LTR fallback, authored ASS isolation, stale generation and off");

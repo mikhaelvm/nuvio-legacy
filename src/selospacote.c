@@ -341,6 +341,7 @@ typedef struct {
   char nome[96];
 } Pacote;
 
+static int contaTamanho = 1, contaTopo, contaLigada = 1;
 static Lote conta, tv;               // donos do cru; `pac` so aponta para eles
 static Pacote pac[SELOS_MAX_PACOTES];
 static int nPac;
@@ -436,6 +437,7 @@ static void compilaPacote(Pacote *p) {
       continue;
     }
     c->raw = f;
+    c->pub.preenchida = !strcasecmp(f->estilo,"filled");
     c->pub.nome = f->nome; c->pub.imagem = f->imagem;
     parseCor(f->tag, &c->pub.temTag, c->pub.tag);
     parseCor(f->texto, &c->pub.temTexto, c->pub.texto);
@@ -554,6 +556,11 @@ static void selospacote_iniciar_i(void) {
   char nome[48], *t;
   if (perfil == perfilLido) return;
   perfilLido = perfil;
+  contaTamanho = contaLigada = 1; contaTopo = 0;
+  snprintf(nome, sizeof nome, "selos-config-p%d.txt", perfil);
+  if ((t = dados_ler(nome))) {
+    sscanf(t, "%d %d %d", &contaTamanho, &contaTopo, &contaLigada); free(t);
+  }
   loteLiberar(&conta); loteLiberar(&tv);
   escolhaExplicita = 0; escolhaUrl[0] = 0;
   nomeArq(nome, sizeof nome, "selos-acct-p%d.json", perfil, 0);
@@ -586,6 +593,19 @@ static void selospacote_iniciar_i(void) {
 void selospacote_iniciar(void) { if (perfis_ativo() == perfilLido) return; travar(); selospacote_iniciar_i(); soltar(); }
 void selospacote_recarregar(void) { travar(); perfilLido = -1; selospacote_iniciar_i(); soltar(); }
 
+static int contaBool(const J *v, int antes) {
+  if (!v) return antes;
+  if (v->t == J_OBJ) v = jGet(v,"value");
+  if (!v) return antes;
+  if (v->t == J_BOOL) return v->b;
+  if (v->t == J_NUM) return v->num != 0;
+  if (v->t == J_STR) {
+    if (!strcasecmp(v->s,"true") || !strcmp(v->s,"1")) return 1;
+    if (!strcasecmp(v->s,"false") || !strcmp(v->s,"0")) return 0;
+  }
+  return antes;
+}
+
 static void selospacote_conta_do_blob_i(const char *blob) {
   J *raiz, *f, *v;
   Lote novo;
@@ -595,6 +615,27 @@ static void selospacote_conta_do_blob_i(const char *blob) {
   raiz = jParse(blob, strlen(blob));
   if (!raiz) return;
   f = jAchar(raiz, "stream_badge_rules", 0);
+  if (!f) f = jAchar(raiz, "streamBadgeRules", 0);
+  J *settings = jAchar(raiz, "stream_badge_settings", 0);
+  if (!settings) settings = jAchar(raiz, "streamBadgeSettings", 0);
+  if (!f && settings) { f = jGet(settings, "rules"); if (!f) f = jGet(settings, "streamBadgeRules"); }
+  if (!f && !settings) { jLiberar(raiz); return; }
+  J *size = jAchar(raiz, "show_file_size_badges", 0);
+  if (!size) size = jAchar(raiz, "showFileSizeBadges", 0);
+  J *place = jAchar(raiz, "stream_badge_placement", 0);
+  if (!place) place = jAchar(raiz, "badgePlacement", 0);
+  J *enabled = jAchar(raiz, "streamBadgesEnabled", 0);
+  if (!enabled) enabled = jAchar(raiz, "stream_badges_enabled", 0);
+  int sizeNew = contaBool(size,contaTamanho);
+  int topNew = place && place->t == J_STR ? !strcasecmp(place->s,"TOP") : contaTopo;
+  int enabledNew = contaBool(enabled,contaLigada);
+  if (sizeNew != contaTamanho || topNew != contaTopo || enabledNew != contaLigada) {
+    char name[48], config[48];
+    contaTamanho = sizeNew; contaTopo = topNew; contaLigada = enabledNew;
+    snprintf(name,sizeof name,"selos-config-p%d.txt",perfilLido);
+    snprintf(config,sizeof config,"%d %d %d\n",contaTamanho,contaTopo,contaLigada);
+    dados_gravar(name,config); versao++;
+  }
   if (!f) { jLiberar(raiz); return; }
   v = f;
   if (f->t == J_OBJ && jGet(f, "value") && !jGet(f, "imports")) v = jGet(f, "value");
@@ -884,7 +925,7 @@ static int casarEmbutido(char *const *cand, const size_t *lens, int ncand, const
   return n;
 }
 
-static int selospacote_casar_i(const char *const *campos, int nc, unsigned short *ids, int max) {
+static int selospacote_casar_i(const char *const *campos, int nc, unsigned short *ids, int max, int soConta) {
   char *arena, *cand[CAND_MAX + 1];
   size_t lens[CAND_MAX + 1];
   int ncand = 0, i, n = 0, ci;
@@ -893,7 +934,7 @@ static int selospacote_casar_i(const char *const *campos, int nc, unsigned short
   size_t jn = 0, jcap = 0;
   selospacote_iniciar();
   if (max <= 0) return 0;
-  if (ativo < 0 && !embCarregar()) return 0;
+  if (!soConta && ativo < 0 && !embCarregar()) return 0;
   p = ativo >= 0 ? &pac[ativo] : NULL;
   arena = malloc((size_t)(CAND_MAX + 1) * CAND_BYTES);
   if (!arena) return 0;
@@ -927,6 +968,22 @@ static int selospacote_casar_i(const char *const *campos, int nc, unsigned short
       junto[jn] = 0;
     }
   } else junto = NULL;
+  if (soConta) {
+    if (contaLigada) for (int pi = 0; pi < nPac && n < max; pi++) {
+      p = &pac[pi]; if (p->daTv || !p->raw->ativo) continue;
+      for (ci = 0; ci < p->nc && ci < 4096 && n < max; ci++) {
+        const FiltroC *c = &p->c[ci];
+        if (!filtroCasa(c, cand, lens, ncand, junto, jn)) continue;
+        int dup = 0;
+        for (int d = 0; d < n; d++) {
+          int pp = (ids[d] >> 12) & 3, cc = ids[d] & 4095;
+          if (!strcmp(pac[pp].c[cc].chave, c->chave)) { dup = 1; break; }
+        }
+        if (!dup) ids[n++] = (unsigned short)(0x8000 | (pi << 12) | ci);
+      }
+    }
+    free(junto); free(arena); return n;
+  }
   if (!p) { n = casarEmbutido(cand, lens, ncand, junto, jn, ids, max); free(junto); free(arena); return n; }
   for (ci = 0; ci < p->nc && n < max; ci++) {
     const FiltroC *c = &p->c[ci];
@@ -939,9 +996,25 @@ static int selospacote_casar_i(const char *const *campos, int nc, unsigned short
   free(junto); free(arena);
   return n;
 }
-int selospacote_casar(const char *const *campos, int nc, unsigned short *ids, int max) { int r; travar(); r = selospacote_casar_i(campos, nc, ids, max); soltar(); return r; }
+int selospacote_casar(const char *const *campos, int nc, unsigned short *ids, int max) { int r; travar(); r = selospacote_casar_i(campos, nc, ids, max, 0); soltar(); return r; }
+
+int selospacote_conta_tem(void) {
+  int n = 0; travar(); selospacote_iniciar();
+  if (contaLigada) for (int i = 0; i < nPac; i++)
+    if (!pac[i].daTv && pac[i].raw->ativo && pac[i].nc) { n = 1; break; }
+  soltar(); return n;
+}
+int selospacote_conta_tamanho(void) { selospacote_iniciar(); return contaLigada && contaTamanho; }
+int selospacote_conta_em_cima(void) { selospacote_iniciar(); return contaTopo; }
+int selospacote_casar_conta(const char *const *campos, int nc, unsigned short *ids, int max) {
+  int r; travar(); r = selospacote_casar_i(campos,nc,ids,max,1); soltar(); return r;
+}
 
 const SeloFiltro *selospacote_filtro(unsigned short id) {
+  if (id & 0x8000) {
+    int p = (id >> 12) & 3, c = id & 4095;
+    return p < nPac && !pac[p].daTv && c < pac[p].nc ? &pac[p].c[c].pub : NULL;
+  }
   if (ativo < 0) {
     int nd = embPac[0].nc;
     if (!embOk) return NULL;

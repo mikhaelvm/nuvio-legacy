@@ -6,4 +6,5 @@
 #define glDeleteTextures teste_glDeleteTextures
 #define glBindTexture    teste_glBindTexture
 #define glTexImage2D     teste_glTexImage2D
+#define glTexSubImage2D  teste_glTexSubImage2D
 #define glTexParameteri  teste_glTexParameteri

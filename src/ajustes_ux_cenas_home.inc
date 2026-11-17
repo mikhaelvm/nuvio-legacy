@@ -161,11 +161,7 @@ static void ajcHMenuItem(int op, const char *ico) {
   }
   // a tela do item: so existe (clara) quando a barra tem o item
   { float a = 0.18f + 0.82f * k, x0 = 238, y0 = 44;
-    if (op == AJ_MENU_EXPLORAR) {   // filtros + grade de cartazes
-      for (i = 0; i < 3; i++) ajc_neutro(x0 + i * 60, y0, 52, 18, 9, a);
-      ajc_acento_ret(x0, y0, 52, 18, 9, a * 0.9f);
-      for (j = 0; j < 2; j++) for (i = 0; i < 4; i++) ajcHBloco(x0 + i * 84, y0 + 34 + j * 108, 74, 98, j * 4 + i, a);
-    } else if (op == AJ_MENU_GUIA) {   // canais e programas em faixas; a linha de agora
+    if (op == AJ_MENU_GUIA) {   // canais e programas em faixas; a linha de agora
       for (j = 0; j < 5; j++) {
         float yy = y0 + j * 50, x = x0 + 52;
         ajc_neutro(x0, yy, 40, 40, 8, a);
@@ -850,7 +846,6 @@ static int ajcNovaHome(int sec, int op) {
     case AJ_ESPACO_FILEIRAS: case AJ_ESPACO_TITULOS: ajcHEspaco(op); return 1;
     case AJ_RAIL_MODERNA: ajcHRailModerna(op); return 1;
     case AJ_RAIL: ajcHRailFixa(op); return 1;
-    case AJ_MENU_EXPLORAR: ajcHMenuItem(op, "aj_compass"); return 1;
     case AJ_MENU_GUIA: ajcHMenuItem(op, "aj_tv-minimal-play"); return 1;
     case AJ_MENU_AGENDA: ajcHMenuItem(op, "aj_calendar"); return 1;
     case AJ_MENU_PERFIL: ajcHMenuItem(op, "aj_user-round"); return 1;

@@ -116,4 +116,5 @@ void gpun_relatar(double fps, double pior, double periodo, int cena, int cheia);
 // Descarta a COR do alvo ligado agora, que vai ser sobrescrito inteiro.
 // `padrao` = 1 se o ligado e a janela (FBO 0). No-op sem ES3/extensao.
 void gpun_descartar_cor(int padrao);
+void gpun_descartar_alvo(void);
 #endif

@@ -46,6 +46,7 @@ typedef struct {
   int   temTag, temTexto, temBorda;   // 0 = o pacote nao define
   float tag[4], texto[4], borda[4];   // RGBA 0..1
   int   arte;              // SeloArte
+  int   preenchida;     // imported tagStyle == filled
   int   resolucao;         // 1 = do grupo de resolucao (a folha de fontes a tira da fileira)
 } SeloFiltro;
 
@@ -72,6 +73,10 @@ int  selospacote_da_tv(int i);                  // 1 = adicionado nesta TV (remo
 int  selospacote_n_filtros(int i);              // filtros validos e ativos
 int  selospacote_ativo(void);                   // -1 = "Do Nuvio" (o embutido)
 void selospacote_escolher(int i);               // -1 ou 0..n-1, guarda no perfil
+int selospacote_conta_tem(void);
+int selospacote_conta_tamanho(void);
+int selospacote_conta_em_cima(void);
+int selospacote_casar_conta(const char *const *campos, int nc, unsigned short *ids, int max);
 unsigned selospacote_versao(void);              // sobe a cada mudanca de lista/escolha
 
 // Acrescenta o(s) pacote(s) do texto baixado de `origem` (a URL). Aceita as 3

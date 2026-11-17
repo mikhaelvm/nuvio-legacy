@@ -12,7 +12,6 @@
 #include "rede.h"
 #include "js.h"
 #include "marco.h"
-#include "ondever.h"
 #include "addonstats.h"
 #include "fontecache.h"
 #include "fontefalha.h"
@@ -780,7 +779,7 @@ AddEstado addons_estado(void) {
         snprintf(t, sizeof t, "%s %s", l[i].rotulo, l[i].descricao);
         l[i].badges = badges_detectar(t);
       }
-      stream_definir_lista(l, n);
+      stream_publicar_alvo(alvoId, l, n, 0);
       printf("[addons] %d personal-server source(s)\n", n);
     } else {
       stream_definir_lista(NULL, 0);
@@ -813,8 +812,8 @@ AddEstado addons_estado(void) {
       // curso — exatamente o que a publicacao por addon existe para preservar.
       if (!pendId[0] && !progPublicou) {
         if (alvoVod())
-          stream_definir_lista_idade(resultado, nResultado, SDL_GetTicks() - resultadoQuando);
-        else stream_definir_lista(resultado, nResultado);
+          stream_publicar_alvo(alvoId, resultado, nResultado, SDL_GetTicks() - resultadoQuando);
+        else stream_publicar_alvo(alvoId, resultado, nResultado, 0);
       }
       if (progPublicou)
         printf("[addons] busca %s em %u ms\n", addons_busca_incompleta() ? "parcial encerrada" : "completa",
@@ -847,7 +846,7 @@ AddEstado addons_estado(void) {
     if (r == FC_ACERTO) {
       adotado = 0;
       printf("[addons] %s: %d fontes do prefetch\n", alvoId, n);
-      stream_definir_lista(l, n);
+      stream_publicar_alvo(alvoId, l, n, 0);
       free(l);
       estado = n ? ADD_PRONTO : ADD_VAZIO;
       return atomic_load(&estado);
@@ -885,7 +884,7 @@ static void progDrenar(void) {
         printf("[plugins] primeira fonte de plugin em %u ms: %s\n",
                (unsigned)(SDL_GetTicks() - progInicio), local[q].a[0].provedor);
       }
-      stream_lista_acrescentar(local[q].a, local[q].n, local[q].idx);
+      stream_acrescentar_alvo(alvoId, local[q].a, local[q].n, local[q].idx);
       progPublicou = 1;
       if (progPubN < (int)(sizeof progPub / sizeof *progPub)) {
         progPub[progPubN++] = local[q];
@@ -904,7 +903,7 @@ static void progRepublicar(void) {
   int q, k = 0;
   stream_definir_lista(NULL, 0);
   for (q = 0; q < progPubN; q++) {
-    stream_lista_acrescentar(progPub[q].a, progPub[q].n, progPub[q].idx);
+    stream_acrescentar_alvo(alvoId, progPub[q].a, progPub[q].n, progPub[q].idx);
     k += progPub[q].n;
   }
   printf("[addons] %s: lista apagada com a busca no ar; %d fonte(s) ja recebida(s) de volta\n",
@@ -2432,14 +2431,8 @@ static void dispararLegendas(int juntar) {
 // socket; nao e ele que custa.
 // NV_ADD_FIOS por -D: a build de comparacao do #80 (rawldon: "v1.3.4, now
 // it's back to freezing") volta a 2 no Tizen para isolar se foi isto.
-#ifdef NV_ADD_FIOS
+#if defined(NV_ADD_FIOS)
 #define ADD_FIOS NV_ADD_FIOS
-#elif defined(__EMSCRIPTEN__)
-// 2 NO TIZEN (1.3.5): a rc1 (2 fios) foi "lisa" no AU7000 e a 1.3.4 (4 fios,
-// junto com o GIF a 3 quadros) voltou a travar (#80). Nao esta provado qual
-// dos dois foi; os dois voltam ao valor da rc1 e o longtask do [navegador]
-// e quem separa.
-#define ADD_FIOS 2
 #else
 // UM FIO POR ADDON (#221), ate 12. Com 4, a quinta consulta so saia quando um
 // dos quatro primeiros soltasse — e um addon mudo segura o fio dele os 12 s
@@ -3856,6 +3849,7 @@ static void buscarPedido(const char *imdb, const char *tipo, int forcar) {
   char id[sizeof alvoId];
   if (!imdb || !*imdb) return;
   stream_filtro_tipo(tipo);
+  stream_definir_alvo(imdb);
   stream_folha_canal(nv_tipo_canal(tipo));
   if (jfid_e(imdb)) {
     // PERSONAL SERVER ITEM. No addon, no source cache, no "where to watch":
@@ -3879,8 +3873,6 @@ static void buscarPedido(const char *imdb, const char *tipo, int forcar) {
     return;
   }
   jfAlvo = 0;
-  if (idbase_e_imdb(imdb))
-    ondever_pedir(imdb, tipo && (!strcmp(tipo, "tv") || !strcmp(tipo, "series")), 0);
   resumo.valido = 0;
   // Recusa de conta do debrid vale por busca: a nova volta a tentar todos.
   debrid_nova_busca();
@@ -3898,7 +3890,7 @@ static void buscarPedido(const char *imdb, const char *tipo, int forcar) {
   // player confere "tt8714904:1:1", acha a lista "de outro alvo" e descartava
   // as 28 fontes do MESMO episodio ("episode changed"). Quem pediu carimbou o
   // id cru agora mesmo; aqui ele vira o que de fato foi perguntado.
-  if (strcmp(id, imdb)) stream_definir_alvo(id);
+  stream_definir_alvo(id);
   if (fioVivo) {
     if (forcar || !escopoAindaAtual(&fioEscopo) || strcmp(id, alvoId) || strcmp(tipo ? tipo : "movie", alvoTipo)) {
       snprintf(pendId, sizeof pendId, "%s", imdb);
@@ -3937,7 +3929,7 @@ static void buscarPedido(const char *imdb, const char *tipo, int forcar) {
     if (renovar) fontecache_vod_apagar(alvoId, alvoTipo, alvoBase, &escopo);
     else if (fontecache_vod_pegar(alvoId, alvoTipo, alvoBase, &escopo,
                             &l, &n, &idade) == FC_ACERTO) {
-      stream_definir_lista_idade(l, n, idade);
+      stream_publicar_alvo(alvoId, l, n, idade);
       free(l);
       alvoBase[0] = 0;
       estado = ADD_PRONTO;
@@ -3955,7 +3947,7 @@ static void buscarPedido(const char *imdb, const char *tipo, int forcar) {
     if (forcar && r == FC_EM_CURSO) r = FC_NADA;
     if (r == FC_ACERTO) {
       printf("[addons] %s: %d fontes do cache\n", alvoId, n);
-      stream_definir_lista(l, n);
+      stream_publicar_alvo(alvoId, l, n, 0);
       free(l);
       estado = n ? ADD_PRONTO : ADD_VAZIO;
       return;

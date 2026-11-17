@@ -19,6 +19,6 @@ A Samsung release: the two settings that went from the test build to 1.3.4 are b
 - If you are on 1.3.4 and want to help: update, accept the card, use the app normally for a day.
 
 ## Packages
-- `space.nuvio.native.legacy_1.3.5_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.3.5_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
+- `com.mikhael.nuvio_1.3.5_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.3.5_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
 - `NuvioTV-1.3.5-tizen.wgt` — Samsung Tizen (WASM).

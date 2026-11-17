@@ -83,8 +83,8 @@ Samsung .tpk: this version changes the .tpk's host code again (interface freeze 
 
 | Platform | File |
 | --- | --- |
-| LG webOS 3+ | `space.nuvio.native.legacy_2.0.5_arm.ipk` |
-| LG with more RAM | `space.nuvio.native.legacy_2.0.5_arm-highcache.ipk` |
+| LG webOS 3+ | `com.mikhael.nuvio_2.0.5_arm.ipk` |
+| LG with more RAM | `com.mikhael.nuvio_2.0.5_arm-highcache.ipk` |
 | Samsung Tizen 4 / 5 / 5.5 | `Nuvio-2.0.5-NuvioTpk40.tpk` |
 | Samsung Tizen 6 | `Nuvio-2.0.5-NuvioTpk60.tpk` |
 | Samsung Tizen 6.5 / 7 | `Nuvio-2.0.5-NuvioTpk65.tpk` |

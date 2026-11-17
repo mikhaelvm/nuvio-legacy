@@ -6,6 +6,6 @@ One change, on Samsung only: animated GIF artwork is now decoded and composed in
 - Nothing else changed since 1.3.7, on purpose: if the GIF is smooth now, this is what did it; if it is not, the log says so without another variable in the way.
 
 ## Packages
-- `space.nuvio.native.legacy_1.3.8_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.3.8_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
+- `com.mikhael.nuvio_1.3.8_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.3.8_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
 - `NuvioTV-1.3.8-tizen.wgt` — Samsung Tizen (WASM).

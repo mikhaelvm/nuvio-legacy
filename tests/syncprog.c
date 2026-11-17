@@ -143,7 +143,7 @@ static void pullAceitaOsFormatosDoServidor(void) {
     " {\"content_id\":\"tt7654321\",\"content_type\":\"movie\",\"season\":null,\"episode\":null,"
     "  \"position\":5400000,\"duration\":7200000,\"last_watched\":1757000150000},"
     " {\"content_id\":\"tt5550000:2:3\",\"position\":1000,\"duration\":100000,\"last_watched\":1757000150},"
-    " {\"content_id\":\"tt9990000\",\"position\":10,\"duration\":500}]";
+    " {\"content_id\":\"tt9990000\",\"position_ms\":10,\"duration_ms\":500}]";
   assert(syncprog_puxar() == 3);            // a de dur <= 1s fica de fora
   assert(!strcmp(ultimaFuncao, "sync_pull_watch_progress") && tem("\"p_profile_id\":1"));
   assert(syncprog_puxadas() == 3);
@@ -288,7 +288,22 @@ static void pullDoPerfilAnteriorNaoSeMistura(void) {
   puts("ok  pull do perfil anterior e descartado depois da troca de perfil");
 }
 
+static void pullCompativelComOutrosClientes(void) {
+  zerar();
+  proximaResposta = "[{\"content_id\":\"tt100\",\"season\":1,\"episode\":2,\"position\":600,\"duration\":2400},"
+    "{\"contentId\":\"tt200\",\"season_number\":2,\"episode_number\":3,\"positionMs\":1200000,\"durationMs\":2400000},"
+    "{\"content_id\":\"tt300\",\"video_id\":\"__nuvio_episode__:3:4\",\"position_ms\":600000,\"duration_ms\":2400000}]";
+  assert(syncprog_puxar() == 3);
+  assert(syncprog_aplicar(NULL) == 3);
+  ProgRegistro a = porChave("tt100_s1e2"), b = porChave("tt200_s2e3"), c = porChave("tt300_s3e4");
+  assert(a.posSeg == 600 && a.durSeg == 2400);
+  assert(b.posSeg == 1200 && b.durSeg == 2400);
+  assert(c.posSeg == 600 && c.durSeg == 2400);
+  puts("ok  tres series: segundos legados, camelCase e video_id sintetico");
+}
+
 int main(void) {
+  pullCompativelComOutrosClientes();
   prog_definir_relogio(relogio);
   pushNoFormatoDoWeb();
   pushFalhoMantemPendente();

@@ -443,6 +443,8 @@ int main(void) {
     quadros(1, 1 / 60.0f, CORVIVA_GRADIENTE, 1, NULL, 0);
     ok(igual3(nv_grad_viva[0], azul.grad[0], 1.0f / 255.0f + 0.001f), "arranque: o degrade tambem volta do arquivo"); }
 
+  quadros(120, 1 / 60.0f, CORVIVA_GRADIENTE, 1, NULL, 0);
+  ok(nv_tempo_viva == 0.0f, "degrade estatico mesmo com animacoes completas");
   free(arquivo);
   if (falhas) { printf("%d falha(s)\n", falhas); return 1; }
   printf("tudo ok\n");

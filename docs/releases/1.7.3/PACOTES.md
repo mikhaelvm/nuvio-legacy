@@ -14,8 +14,8 @@ Runtime LG/Samsung: `4ffb8a23abdf80347ba0cf11150957e511ff8ebb`. APK Android atua
 | NuvioTV-1.7.3-tizen.wgt | 29077672 | `100952bdea8c345166c0631af3fcc27b838afafac62abc7fb41a15c46f4c8471` |
 | libnuvio-1.7.3-tpk-arm.so | 9905284 | `a79497bbf8d6c8f64dd66d1938ca1c99c969c9f139caec5e07f5f9e85b185121` |
 | libnuvio-1.7.3-tpk40-arm.so | 9909376 | `07b146cf225d7afd189f3cf47753983693be6c28514c8c761bdb00f8290600ee` |
-| space.nuvio.native.legacy_1.7.3_arm-highcache.ipk | 53005048 | `353e79fe907e3d224f51bd7e05ad8aba1834d937e8e067f80c65887e0c3a79ba` |
-| space.nuvio.native.legacy_1.7.3_arm.ipk | 53005324 | `625f88988ce571fe8bff263b56a59d1f1b59c4c7eef86f8e0673f45947ee379d` |
+| com.mikhael.nuvio_1.7.3_arm-highcache.ipk | 53005048 | `353e79fe907e3d224f51bd7e05ad8aba1834d937e8e067f80c65887e0c3a79ba` |
+| com.mikhael.nuvio_1.7.3_arm.ipk | 53005324 | `625f88988ce571fe8bff263b56a59d1f1b59c4c7eef86f8e0673f45947ee379d` |
 
 Geradores: arm.sh --ipk --build (padrão e high-cache), release-samsung.sh e release-android.sh. Gerados também repo.json, webosbrew.manifest.json e SHA256SUMS.
 

@@ -6,7 +6,7 @@
 #include <string.h>
 
 const char *desc_tmdb_idioma(void) { return "en-US"; }
-int ajustes_teclado_android(void) { return 0; }
+int ajustes_teclado_modo(void) { return 0; }
 #ifdef NV_ANDROID
 static int accepted, keyboards;
 int android_st_ditar(const char *language) { assert(!strcmp(language, "en-US")); return accepted; }

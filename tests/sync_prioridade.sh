@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 work=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-sync-prioridade.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT
-flags=(-std=gnu11 -D_GNU_SOURCE -O1 -g -Isrc -Itests -pthread
+flags=(-std=gnu11 -D_GNU_SOURCE -DNV_PERFIL_SESSAO_FORTE -O1 -g -Isrc -Itests -pthread
   -I/opt/homebrew/include -I/opt/homebrew/include/SDL2
   -ffunction-sections -fdata-sections)
 gc=(-Wl,--gc-sections)

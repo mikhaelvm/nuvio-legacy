@@ -325,7 +325,7 @@ static void montarTela(int taxaKbps) {
   size_t u;
   memset(&tela, 0, sizeof tela);
   tela.plataforma = (int)ptv_plataforma();
-  samsung = tela.plataforma == PTV_TIZEN || tela.plataforma == PTV_TPK;
+  samsung = 0;
   if (c) snprintf(tela.titulo, sizeof tela.titulo, "%s", c->titulo);
   u = 0;
   if (ep && ep[0]) u += (size_t)snprintf(tela.sub + u, sizeof tela.sub - u, "%s", ep);
@@ -744,7 +744,7 @@ static float tileQuadros(GfxRect r, float a) {
       return 160 + texto(EVU_SUB, i18n("desde que o filme abriu"), 180, 180, 182,
                          x + (float)l.w + 7, r.y + 160, w - (float)l.w - 7, 2, 0, 0, a); }
   }
-  int samsung = tela.plataforma == PTV_TIZEN || tela.plataforma == PTV_TPK;
+  int samsung = 0;
   numero(i18n("Indisponível"), NULL, x, y + 8, a, 1, w);
   return 154 + texto(EVU_TEXTO, i18n(samsung ? "O decodificador da Samsung não conta quadros"
                                              : "O player desta TV não conta quadros"),
@@ -753,13 +753,6 @@ static float tileQuadros(GfxRect r, float a) {
 
 static const char *nomePlataforma(int p) {
   switch (p) {
-    case PTV_TIZEN: return "Samsung · Tizen";
-#ifdef NV_TPK40
-    case PTV_TPK: return "Samsung · Tizen 4/5";
-#else
-    case PTV_TPK: return "Samsung · Tizen 6+";
-#endif
-    case PTV_ANDROID: return "Android TV";
     default: return "LG webOS";
   }
 }

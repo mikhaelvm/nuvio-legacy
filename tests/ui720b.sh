@@ -16,7 +16,6 @@ printf '%s\0' "${sources[@]}" tests/ui720b.c |
     -Wno-deprecated-declarations -Wno-macro-redefined
 cc "$work"/src/*.o "$work"/src/dts/*.o "$work"/tests/*.o -o "$work/test" \
   -L/opt/homebrew/lib -lSDL2 -lSDL2_image -lSDL2_ttf -lz -framework OpenGL
-python3 tests/ui720_surface.py
 python3 tests/ui720b_host.py
 for panel in 3840x2160 1920x1080 1280x720 7680x4320 invalid 0x2160 desktop4k; do
   env -u NUVIO_PANEL_SIZE -u NUVIO_PANEL_SOURCE "$work/test" "$panel"

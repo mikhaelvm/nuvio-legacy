@@ -19,6 +19,6 @@ TorBox P2P torrents play again, the home stops rebuilding itself from scratch, a
 - If a TorBox torrent still doesn't start, send a log right after picking it: the lines starting with `[debrid]` say what TorBox answered.
 
 ## Packages
-- `space.nuvio.native.legacy_1.4.5_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.4.5_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.4.5_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.4.5_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.4.5-tizen.wgt` — Samsung Tizen (WASM), unsigned; sign it with your own certificate as before.

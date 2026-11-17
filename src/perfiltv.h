@@ -12,11 +12,7 @@
 #define NV_PERFILTV_H
 #include <stddef.h>
 
-// PTV_TPK = o .tpk NATIVO da Samsung (NV_TPK). Nao e o PTV_TIZEN: la o app
-// vive no heap fixo de 256 MiB do WASM e as texturas no processo de GPU do
-// navegador; aqui e um processo nativo como o da LG, com fios de rede proprios
-// (curl) e as texturas no driver da TV. Tabela propria em perfiltv.c.
-typedef enum { PTV_LG = 0, PTV_TIZEN = 1, PTV_TPK = 2, PTV_ANDROID = 3 } PtvPlataforma;
+typedef enum { PTV_LG = 0 } PtvPlataforma;
 typedef enum { PTV_QUALIDADE = 0, PTV_DESEMPENHO = 1 } PtvModo;
 
 typedef struct {
@@ -25,12 +21,12 @@ typedef struct {
   int heroiLarg;  // teto de decodificacao da arte de tela cheia, px
 } PtvPerfil;
 
-// Build identity. Android retains the previous conservative native policy.
+// Build identity for LG webOS.
 PtvPlataforma ptv_plataforma(void);
 // Stable English identifiers for diagnostics; not a hardware recommendation.
 const char *ptv_plataforma_nome(PtvPlataforma p);
 
-// GPU FRACA, pelo GL_RENDERER (so vale para PTV_TPK). 1 = Mali de geracao
+// GPU FRACA, pelo GL_RENDERER. 1 = Mali de geracao
 // antiga (Utgard "Mali-4xx", Midgard "Mali-T...", inclusive o "Mali-TDVX" das
 // Samsung 2019 — registro 8825: 22-29 fps na home com a CPU ociosa). Aritmetica
 // de texto, sem GL: gpunivel.c le a string e passa por ptv_definir_gpu_fraca.

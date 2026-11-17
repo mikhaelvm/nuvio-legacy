@@ -476,11 +476,6 @@ static float ajPreviaCor(float x, float y, float w) {
     txt_desenhar(l, x + 70, y + 172 + (44 - l.h) * 0.5f);
     gfx_cor((GfxRect){ x + 26 + bw + 10, y + 172, 44, 44 }, 0.5f, 1, 1, 1, 0.12f);
     gfx_cor((GfxRect){ x + 26 + bw + 62, y + 172, 44, 44 }, 0.5f, 1, 1, 1, 0.12f); }
-  { TxtLinha l = txt_linha(TXT_AJ_MINI13, "Só MP4", (int)(ar * 255), (int)(ag * 255), (int)(ab * 255), 255);
-    float cw = 14 + 6 + 7 + l.w + 14;
-    gfx_cor((GfxRect){ x + 26, y + 236, cw, 36 }, 0.5f, ar, ag, ab, 0.22f);
-    gfx_cor((GfxRect){ x + 40, y + 251, 6, 6 }, 0.5f, ar, ag, ab, 1);
-    txt_desenhar(l, x + 53, y + 236 + (36 - l.h) * 0.5f); }
   { GfxRect mb = { x + w - 20 - 150, y + 20, 150, 8 + 3 * 34 + 8 };
     static const char *const M[3] = { "Início", "Explorar", "Ajustes" };
     if (ajVid()) gfx_cor(mb, 20.0f / mb.h, 0.055f, 0.059f, 0.071f, 0.82f); // vidro-ok: Ajustes preview mock

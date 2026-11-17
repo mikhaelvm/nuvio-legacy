@@ -72,12 +72,7 @@
 // novo e o antigo (aposentar, catalogo.c): ~75 MB de pico. A rodada de pedidos
 // e fatiada em CAT_RODADA_MAX (24) fileiras, entao os baldes dos fios somam no
 // maximo 24 x 375 KB = ~9 MB, qualquer que seja o limite.
-#ifdef NV_ANDROID
-#define FIL_LIMITE_MAX    200
-#define FIL_LIMITE_ILIMITADO FIL_LIMITE_MAX
-#else
 #define FIL_LIMITE_MAX    FIL_LIMITE_MAX_TV
-#endif
 #define FIL_LIMITE_PADRAO  7
 // Ate aqui e o que sempre foi permitido sem aviso.
 #define FIL_LIMITE_SEGURO 16
@@ -119,7 +114,7 @@ typedef enum {
   FIL_TIPO_REDONDA,      // FILEIRA_REDONDA — avatar circular com o nome embaixo (fileiras de pessoas)
   // "Herói" (#205): FILEIRA_HEROI — um cartão só do tamanho da fileira, com
   // fundo, selo, título e duas linhas. No fim pelo mesmo motivo dos outros.
-  FIL_TIPO_HEROI,        // fonte: a própria fileira; curadoria do Nuvio Legacy; sorteio
+  FIL_TIPO_HEROI,        // fonte: a própria fileira; curadoria do Nuvio; sorteio
   // 14/10 (dono): "o pôster só que do tamanho do grande tipo o 3:4 grande",
   // com mais informação na base e o véu na cor predominante. No fim, pelo
   // mesmo motivo: o número gravado dos tipos acima não muda.

@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(NV_WEBOS) || defined(NV_TPK)
+#if defined(NV_WEBOS)
 #include <dlfcn.h>
 #endif
 #ifdef NV_WEBOS
@@ -68,7 +68,7 @@ static void painelWebos(int *size) {
   memset(&error, 0, sizeof error); errorInit(&error);
   context = contextNew();
   char name[96];
-  snprintf(name, sizeof name, "com.webos.media.client.nuvio.panel.%d", (int)getpid());
+  snprintf(name, sizeof name, "com.webos.media.client.com.mikhael.nuvio.panel.%d", (int)getpid());
   if (context && reg(name, &bus, &error) && attach(bus, context, &error) &&
       call(bus, "luna://com.webos.service.tv.systemproperty/getSystemInfo",
            "{\"keys\":[\"panelResolution\",\"UHD\"]}", painelResposta, size, &token, &error)) {
@@ -98,7 +98,7 @@ static int painel4k(void) {
       source = origin && *origin ? origin : "platform panel";
     } else {
       width = height = 0;
-#ifdef NV_WEBOS
+#if defined(NV_WEBOS)
       int panel[3] = {0};
       // LG's SDL exposes the physical panel even when LS2 denies the query.
       SDL_bool (*getPanel)(int *, int *) = NULL;
@@ -113,16 +113,6 @@ static int painel4k(void) {
       }
       if (process) dlclose(process);
       width = panel[0]; height = panel[1];
-#elif defined(NV_TPK)
-      void *lib = dlopen("libcapi-system-info.so.0", RTLD_NOW);
-      if (!lib) lib = dlopen("libcapi-system-info.so", RTLD_NOW);
-      int (*get)(const char *, int *) = NULL;
-      if (lib) *(void **)&get = dlsym(lib, "system_info_get_platform_int");
-      if (get && get("http://tizen.org/feature/screen.width", &width) == 0 &&
-          get("http://tizen.org/feature/screen.height", &height) == 0 && width > 0 && height > 0)
-        source = "Tizen system info screen";
-      else width = height = 0;
-      if (lib) dlclose(lib);
 #endif
     }
     if (width <= 0 || height <= 0) width = height = 0;

@@ -7,7 +7,7 @@
 
 static void (*avisoCb)(void);   // memlog_quando_aviso (fio principal)
 
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__)
 static int abaixo; // Compartilhado por FPS e player, ambos no fio principal.
 
 static long lerKB(const char *path, const char *campo) {
@@ -30,7 +30,7 @@ static long lerKB(const char *path, const char *campo) {
 void memlog_amostra(char *sufixo, size_t tamanho) {
   if (!tamanho) return;
   sufixo[0] = 0;
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__)
   long rss = lerKB("/proc/self/status", "VmRSS:");
   long disponivel = lerKB("/proc/meminfo", "MemAvailable:");
   if (rss < 0 || disponivel < 0) return;
@@ -46,7 +46,7 @@ void memlog_amostra(char *sufixo, size_t tamanho) {
 }
 
 int memlog_pouca_memoria(void) {
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__)
   long kb = lerKB("/proc/meminfo", "MemAvailable:");
   return kb >= 0 && kb < MEMLOG_PISO_MB * 1024;
 #else
@@ -54,22 +54,9 @@ int memlog_pouca_memoria(void) {
 #endif
 }
 
-// Mesma regra do NvPlayer.poucaRamAparelho: ate 3 GiB de RAM total. So Android.
-int memlog_android_fraco(void) {
-#if defined(__ANDROID__)
-  static int fraco = -1;
-  if (fraco < 0) {
-    long kb = lerKB("/proc/meminfo", "MemTotal:");
-    fraco = kb > 0 && kb <= 3L * 1024 * 1024;
-  }
-  return fraco;
-#else
-  return 0;
-#endif
-}
 
 long memlog_livre_mb(void) {
-#if defined(__linux__) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__)
   long kb = lerKB("/proc/meminfo", "MemAvailable:");
   return kb >= 0 ? kb / 1024 : -1;
 #else

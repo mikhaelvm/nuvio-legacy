@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
   snprintf(e.host, sizeof e.host, "cdn-17.exemplo.net");
   e.perdidos = 3; e.quadros = 41280; e.quadrosOrigem = EVO_MEDIDO;
   snprintf(t.codecHdr, sizeof t.codecHdr, "HEVC · HDR10");
-  t.plataforma = PTV_ANDROID;
+  t.plataforma = PTV_LG;
   estatvivo_teste(&e, &t);
   estatvivo_abrir();
   snprintf(nome, sizeof nome, "%s-1-android.png", saida);
@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
   snprintf(e.host, sizeof e.host, "cdn-17.exemplo.net");
   e.quadrosOrigem = EVO_SEM;
   snprintf(t.codecHdr, sizeof t.codecHdr, "HEVC · HDR10 (add-on)");
-  t.plataforma = PTV_TPK;
+  t.plataforma = PTV_LG;
   estatvivo_teste(&e, &t);
   snprintf(nome, sizeof nome, "%s-3-samsung.png", saida);
   captura(nome, 90);

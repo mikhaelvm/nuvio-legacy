@@ -36,6 +36,10 @@ static float  tempo;
 
 // --- LUZ ---------------------------------------------------------------------
 static float  luzX = -1.0f;
+static GfxMini luzCache;
+static float luzChave[8];
+static int luzValida, luzLeve, luzMinima;
+
 static GLuint graoTex;
 static unsigned semente = 0x2545f491u;
 static float  graoDx, graoDy;
@@ -54,8 +58,13 @@ static float  riscoX, riscoV;
 static float aleat(void) { semente = semente * 1664525u + 1013904223u; return (float)(semente >> 8) / 16777216.0f; }
 static float suave(float t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3.0f - 2.0f * t); }
 
+void psestilos_aliviar(void) {
+  gfx_mini_liberar(&luzCache); luzValida = 0;
+}
+
 void psestilos_iniciar(void) {
   int i;
+  gfx_mini_liberar(&luzCache); luzValida = 0;
   tempo = 0.0f;
   parAtual.n = 0; parAtual.perfil = -1; parTemAnt = 0; parTroca = 1.0f;
   luzX = -1.0f;
@@ -255,7 +264,8 @@ static void desenharFilmes(const PSCena *c, float alfa) {
 }
 
 static void desenharLuz(const PSCena *c, float alfa) {
-  float t = tempo, resp = c->reduzida ? 1.0f : 0.85f + 0.15f * sinf(t * 0.6f);
+  // Decorative gradients stay still; focus and colour transitions remain live.
+  float t = 0.0f, resp = c->reduzida ? 1.0f : 0.85f;
   float lx = luzX < 0.0f ? c->xFoco : luzX;
   gfx_cor((GfxRect){ 0, 0, NV_TELA_W, NV_TELA_H }, 0, 0.012f, 0.012f, 0.016f, 1);
   { float cy = 660.0f + sinf(t * 0.3f) * 40.0f, r = 1040.0f;
@@ -324,8 +334,34 @@ static void desenharProjetor(const PSCena *c, float alfa) {
   graoDesenhar(0.07f * alfa);
 }
 
+static void luzDesenharCache(const PSCena *c, float alfa) {
+  float chave[8];
+  int leve = gfx_efeitos_leves(), minima = gfx_efeitos_minimos();
+  memcpy(chave, c->luz, sizeof c->luz);
+  chave[7] = c->reduzida ? 1.0f : 0.0f;
+  chave[6] = luzX < 0.0f ? c->xFoco : luzX;
+  // Tiny residual focus interpolation must eventually stop invalidating.
+  chave[6] = floorf(chave[6] * 4.0f + 0.5f) * 0.25f;
+  if (alfa < 0.999f || gfx_mini_ativo() ||
+      !gfx_mini_alvo(&luzCache, NV_TELA_W, NV_TELA_H)) {
+    desenharLuz(c, alfa); return;
+  }
+  if (!luzValida || memcmp(chave, luzChave, sizeof chave) ||
+      leve != luzLeve || minima != luzMinima) {
+    float grupo = gfx_opacidade_grupo;
+    gfx_opacidade_grupo = 1;
+    gfx_mini_comecar(&luzCache, 0, 0, 1);
+    desenharLuz(c, 1);
+    gfx_mini_terminar();
+    gfx_opacidade_grupo = grupo;
+    memcpy(luzChave, chave, sizeof chave);
+    luzLeve = leve; luzMinima = minima; luzValida = 1;
+  }
+  gfx_mini_desenhar(&luzCache, (GfxRect){0, 0, NV_TELA_W, NV_TELA_H}, 0, 1);
+}
+
 void psestilos_desenhar(const PSCena *c, int modo, float alfa) {
   if (modo == PS_FUNDO_FILMES) desenharFilmes(c, alfa);
-  else if (modo == PS_FUNDO_LUZ) desenharLuz(c, alfa);
+  else if (modo == PS_FUNDO_LUZ) luzDesenharCache(c, alfa);
   else if (modo == PS_FUNDO_PROJETOR) desenharProjetor(c, alfa);
 }

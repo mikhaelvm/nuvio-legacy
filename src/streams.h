@@ -221,6 +221,8 @@ int  stream_n_candidatas(void);
 // stream_lista_do_alvo devolve 0 tambem quando a lista esta vazia ou sem
 // carimbo: em duvida a resposta e "nao e sua", e o custo de errar para este
 // lado e uma busca a mais.
+int stream_publicar_alvo(const char *id, const Stream *l, int qtd, Uint32 idade);
+int stream_acrescentar_alvo(const char *id, const Stream *l, int qtd, int ordem);
 void stream_definir_alvo(const char *id);
 int  stream_lista_do_alvo(const char *id);
 // Descarta a lista porque ela e de outro alvo. `porque` so entra no log.
@@ -490,4 +492,5 @@ int  stream_folha_escolheu(int *escolhido);
 // Captured at dispatch, so a delayed worker cannot adopt another profile's list.
 int stream_canal_primeira_viva_sessao(int tentativas, uint64_t sessao);
 int stream_verificar_proxima_vod_sessao(int atualIdx, int tentativas, int *conferidas, uint64_t sessao);
+float stream_selos_fonte(const Stream *s, float x, float y, float maxW, float h, float tom, float a, int medir);
 #endif

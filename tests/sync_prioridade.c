@@ -7,7 +7,47 @@
 #define colfileiras_sincronizar fixture_colfileiras_sincronizar
 #define nuvem_freio_ativo fixture_nuvem_freio_ativo
 #define addons_definir_lista fixture_addons_definir_lista
+#define perfis_sessao_geracao base_perfis_sessao_geracao
+#define perfis_sessao_atual base_perfis_sessao_atual
+#define perfis_sessao_travar base_perfis_sessao_travar
+#define perfis_sessao_destravar base_perfis_sessao_destravar
+#define sessao_identidade_local_copiar base_sessao_identidade_local_copiar
+#define sessao_token_copiar base_sessao_token_copiar
+#define sessao_token_recusado base_sessao_token_recusado
+#define nuvem_rpc_com base_nuvem_rpc_com
+#define nuvem_tabela base_nuvem_tabela
+#define perfis_puxar_sessao base_perfis_puxar_sessao
+#define syncprog_puxar_sessao base_syncprog_puxar_sessao
+#define syncprog_empurrar_sessao base_syncprog_empurrar_sessao
+#define debrid_conta_iniciar base_debrid_conta_iniciar
+#define debrid_conta_definir base_debrid_conta_definir
+#define debrid_aplicar_chaves_conta base_debrid_aplicar_chaves_conta
+#define desc_sessao_preparada base_desc_sessao_preparada
+#define desc_sessao_passo base_desc_sessao_passo
+#define ajustes_perfil_padrao base_ajustes_perfil_padrao
+#define extras_abrir_sessao base_extras_abrir_sessao
+#define desc_abrir_sessao base_desc_abrir_sessao
 #include "syncordem.c"
+#undef perfis_sessao_geracao
+#undef perfis_sessao_atual
+#undef perfis_sessao_travar
+#undef perfis_sessao_destravar
+#undef sessao_identidade_local_copiar
+#undef sessao_token_copiar
+#undef sessao_token_recusado
+#undef nuvem_rpc_com
+#undef nuvem_tabela
+#undef perfis_puxar_sessao
+#undef syncprog_puxar_sessao
+#undef syncprog_empurrar_sessao
+#undef debrid_conta_iniciar
+#undef debrid_conta_definir
+#undef debrid_aplicar_chaves_conta
+#undef desc_sessao_preparada
+#undef desc_sessao_passo
+#undef ajustes_perfil_padrao
+#undef extras_abrir_sessao
+#undef desc_abrir_sessao
 #undef main
 #undef sessao_rpc
 #undef syncprog_aplicar
@@ -100,11 +140,14 @@ int nuvem_freio_ativo(void) { return atomic_load(&blockSync); }
 void debrid_conta_iniciar(DebridConta *d) { memset(d, 0, sizeof *d); }
 void debrid_conta_definir(DebridConta *d, const char *s, const char *k) { (void)d; (void)s; (void)k; }
 int debrid_aplicar_chaves_conta(const DebridConta *d, uint64_t s) { (void)d; return perfis_sessao_atual(s); }
-void desc_sessao_preparada(void) {}
+int desc_sessao_preparada(void) { return 1; }
 void desc_sessao_passo(void) {}
 void ajustes_perfil_padrao(void) {}
 void extras_abrir_sessao(void) {}
 void desc_abrir_sessao(void) {}
+int ajustes_edicao_perfil(void) { return 0; }
+void ajustes_edicao_encerrar(void) {}
+int ajustes_migrar_escopo(void) { return 0; }
 static void awaitFlag(atomic_int *f) {
   for (int i = 0; !atomic_load(f) && i < 1000; i++) usleep(1000);
   assert(atomic_load(f));
@@ -170,7 +213,10 @@ int main(int argc, char **argv) {
     puts("PASS: A -> B -> A rejects stale progress and structural readiness");
   } else {
     assert(sync_perfil_pronto());
-    assert(atomic_load(&progressApplied) == (!empty&&!failed) && atomic_load(&refreshes) == (!empty&&!failed));
+    printf("counts applied=%d refresh=%d\n", atomic_load(&progressApplied), atomic_load(&refreshes));
+    assert(atomic_load(&progressApplied) == (!empty&&!failed));
+    // Applying changed profile settings legitimately refreshes an early CW again.
+    assert(atomic_load(&refreshes) >= (!empty&&!failed) && atomic_load(&refreshes) <= 2);
     assert(atomic_load(&pushes) == 1 && atomic_load(&structureApplied) == 1);
     assert(sync_home_fontes_prontas());
     if (!failProgressThread) assert(colDoOutro == 1);
@@ -187,6 +233,24 @@ int main(int argc, char **argv) {
       assert(atomic_load(&progressApplied)==2 && atomic_load(&refreshes)==2);
       assert(atomic_load(&structureApplied)==2 && atomic_load(&pushes)==2);
       puts("PASS: warm refresh keeps ready Home while its new progress remains blocked");
+    }
+    if (argc > 1 && !strcmp(argv[1], "concurrent")) {
+      int ap = atomic_load(&progressApplied), rf = atomic_load(&refreshes);
+      int ad = atomic_load(&addonsApplied), st = atomic_load(&structureApplied);
+      atomic_store(&progressEntered, 0); atomic_store(&progressRelease, 0);
+      assert(sync_periodico(40000)); awaitFlag(&progressEntered);
+      assert(!sync_periodico(40001)); // no overlapping poll/full cycle
+      atomic_store(&progressRelease, 1);
+      for (int q = 0; q < 500 && atomic_load(&progressApplied) == ap; q++) {
+        usleep(1000); sync_passo(40002 + q);
+      }
+      assert(atomic_load(&progressApplied) == ap + 1 && atomic_load(&refreshes) == rf + 1);
+      assert(atomic_load(&addonsApplied) == ad && atomic_load(&structureApplied) == st);
+      assert(atomic_load(&pushes) == 1); // no full sync or catalog rebuild
+      puts("PASS: 30-second progress poll applies new data without refreshing Home sources");
+      atomic_store(&blockSync, 1);
+      assert(!sync_periodico(80000));
+      atomic_store(&blockSync, 0);
     }
     if(empty||failed)puts("PASS: empty/failed progress does not suppress Home or trigger a false refresh");
     if(backoff)puts("PASS: account backoff creates no worker and recovers on the next allowed cycle");

@@ -28,7 +28,7 @@ A new live TV guide, Settings organized like the web app, matching color, a spee
 - The speed test downloads a few seconds of real streams. With some debrid services that can make the file show up in your debrid panel.
 
 ## Packages
-- `space.nuvio.native.legacy_1.5.0_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.5.0_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.5.0_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.5.0_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.5.0-tizen.wgt` — Samsung Tizen (WASM), unsigned; sign it with your own certificate as before.
 - `repo.json`, `webosbrew.manifest.json` — Homebrew Channel repository files.

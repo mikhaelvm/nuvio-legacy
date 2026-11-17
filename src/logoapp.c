@@ -25,8 +25,8 @@ const char *logoapp_nome(int logo) {
 
 const char *logoapp_caminho(int logo, int forma) {
   static const char *ARQ[LOGO_N][3] = {
-    { "logo-novo-simbolo.png", "logo-novo-marca.png", "logo-novo-horizontal.png" },
-    { "logo-classico.png",     "abertura.jpg",        "nuvio_wordmark.png" },
+    { "nuvio-oficial-simbolo.png", "nuvio-oficial-marca.png", "nuvio-oficial-marca.png" },
+    { "nuvio-oficial-simbolo.png", "nuvio-oficial-marca.png", "nuvio-oficial-marca.png" },
   };
   if (logo < 0 || logo >= LOGO_N || forma < 0 || forma > 2) return "";
   if (!caminhos[logo][forma][0])

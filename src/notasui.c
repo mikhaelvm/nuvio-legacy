@@ -145,11 +145,12 @@ static float larguraItem(int f, int cru) {
   (void)n100;
   if (f == EX_IMDB) return badge_imdb_largura(cru);
   textoLinha(f, cru, v, sizeof v);
+  if (strchr(v, '%')) { char b[96]; snprintf(b,sizeof b,"%s · %s",nf_nome(f),v); return txt_largura(TXT_MINI,b)+24.0f; }
   if (f == EX_METACRITIC && !modoIcone) {
     float w = (float)txt_largura(TXT_CAPTION2, v) + 14.0f;
     return w > ALT_QUADRO ? w : ALT_QUADRO;
   }
-  if (f == EX_METAUSER) return DIAM_USER;
+  if (f == EX_METAUSER) { char b[80]; snprintf(b,sizeof b,"Metacritic usuários %s",v); return txt_largura(TXT_MINI,b)+24.0f; }
   { float lv = (float)txt_largura(TXT_DET_META2, v), lm;
     if (marcaNativa(f)) lm = larguraNativa(f);
     else { Png p = pngDe(f, cru, 1);
@@ -192,6 +193,12 @@ static void desenhaItem(int f, int cru, float x, float yc, float a) {
   char v[24];
   textoLinha(f, cru, v, sizeof v);
   if (f == EX_IMDB) { badge_imdb(x, yc - BADGE_H * 0.5f, cru, 0, a); return; }
+  if (strchr(v, '%')) {
+    char b[96]; snprintf(b,sizeof b,"%s · %s",nf_nome(f),v);
+    TxtLinha l=txt_linha(TXT_MINI,b,235,235,240,255);
+    gfx_cor((GfxRect){x,yc-18,larguraItem(f,cru),36},.5f,.13f,.15f,.18f,a);
+    txt_desenhar_alpha(l,x+12,yc-l.h*.5f,a); return;
+  }
   if (f == EX_METACRITIC && !modoIcone) {
     float r, g, b, w = larguraItem(f, cru);
     int c;
@@ -209,9 +216,11 @@ static void desenhaItem(int f, int cru, float x, float yc, float a) {
     TxtLinha l;
     nf_cor_metacritic(nf_norm100(f, cru), &r, &g, &b);
     c = tintaSobre(r, g, b);
-    l = txt_linha(TXT_MINI, v, c, c, c, 255);
-    gfx_cor((GfxRect){ x, yc - DIAM_USER * 0.5f, DIAM_USER, DIAM_USER }, 0.5f, r, g, b, a);
-    txt_desenhar_alpha(l, x + (DIAM_USER - (float)l.w) * 0.5f, yc - (float)l.h * 0.5f, a);
+    char label[80]; snprintf(label,sizeof label,"Metacritic usuários %s",v);
+    l = txt_linha(TXT_MINI, label, c, c, c, 255);
+    float w = larguraItem(f, cru);
+    gfx_cor((GfxRect){ x, yc - 18, w, 36 }, .5f, r, g, b, a);
+    txt_desenhar_alpha(l, x + 12, yc - (float)l.h * .5f, a);
     return;
   }
   { float lm, h = alturaLinha(f);
@@ -366,7 +375,7 @@ static void medir(const NotasSecao *s, Medidas *m) {
     m->nFontes++;
   }
   if (m->nFontes) {
-    int linhas = (m->nFontes + 1 + TILE_COLS - 1) / TILE_COLS;
+    int linhas = (m->nFontes + TILE_COLS - 1) / TILE_COLS;
     float hg = (float)linhas * TILE_H + (float)(linhas - 1) * TILE_GAP;
     // UMA fonte nao enche o cartao de resumo: sem "Menor/Maior" e sem a barra
     // critica x publico (os dois precisam de r.n > 1), um piso de 448 deixava
@@ -590,26 +599,6 @@ float notasui_fontes_desenhar(const NotasSecao *s, float x, float y, float a,
     float ty = y + (notasEmpilhadas() ? m.scoreH + COL_GAP : 0) + (float)(i / TILE_COLS) * (TILE_H + TILE_GAP);
     if (ty > NV_TELA_H || ty + TILE_H < 0.0f) continue;
     desenhaBloco(s, m.fontes[i], m.norm[i], &r, tx, ty, 0.0f, aa);
-  }
-  // Personal score shares the source grid, with a solid surface in both materials.
-  float px = gx + (m.nFontes % TILE_COLS) * (TILE_W + TILE_GAP);
-  float py = y + (notasEmpilhadas() ? m.scoreH + COL_GAP : 0) +
-             (m.nFontes / TILE_COLS) * (TILE_H + TILE_GAP);
-  GfxRect tile = {px, py, TILE_W, TILE_H};
-  if (py < NV_TELA_H && py + TILE_H > 0) {
-    float ar, ag, ab;
-    char value[24];
-    ajustes_acento(&ar, &ag, &ab);
-    gfx_cor(tile, 18 / TILE_H, .094f, .098f, .11f, aa);
-    TxtLinha label = txt_linha(TXT_G18M, "Sua nota", 174, 179, 186, 255);
-    txt_desenhar_alpha(label, px + 24, py + 16, aa);
-    if (s->notaPessoal > 0) {
-      snprintf(value, sizeof value, "%d.%d", s->notaPessoal / 2, s->notaPessoal % 2 * 5);
-      plrui_decimal(value);
-    } else snprintf(value, sizeof value, "—");
-    TxtLinha number = txt_linha(TXT_ILHA_PERGUNTA, value, 243, 242, 239, 255);
-    gfx_icone((GfxRect){px + 24, py + 53, 26, 26}, "pl_star-f", ar, ag, ab, aa);
-    txt_desenhar_alpha(number, px + 60, py + 44, aa);
   }
   if (!aberto) textogate_passo(&gateFontes, txt_pendentes - pend0, SDL_GetTicks());
   return m.h;

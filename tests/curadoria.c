@@ -1,6 +1,6 @@
 // CURADORIA DA FILEIRA HEROI (#205): onde o cartao unico pega o titulo.
 //
-// A regra inteira em tres portas, na ordem: a curadoria do Nuvio Legacy (se o
+// A regra inteira em tres portas, na ordem: a curadoria do Nuvio (se o
 // imdb baixado esta no catalogo), o primeiro titulo da propria fileira (a
 // colecao onde a pessoa aplicou o estilo) e, so quando a fileira esta vazia, um
 // sorteio do catalogo — estavel na sessao, senao a remontagem trocaria o

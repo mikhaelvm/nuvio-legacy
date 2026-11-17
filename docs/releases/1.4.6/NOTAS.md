@@ -25,7 +25,7 @@ Posters with the right art again, Trakt rows on screen in seconds, a lighter Sav
 - LG with the Homebrew Channel: add `https://github.com/iqui27/nuvio-native-legacy/releases/latest/download/repo.json` as a repository to get updates from the channel.
 
 ## Packages
-- `space.nuvio.native.legacy_1.4.6_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.4.6_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.4.6_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.4.6_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.4.6-tizen.wgt` — Samsung Tizen (WASM), unsigned; sign it with your own certificate as before.
 - `repo.json`, `webosbrew.manifest.json` — Homebrew Channel repository files.

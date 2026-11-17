@@ -211,6 +211,7 @@ static void pintarBorrada(void *ctx) {
     r.x -= 40.0f; r.y -= 40.0f; r.w += 80.0f; r.h += 80.0f;
     gfx_rect(r, b->d, GFX_ARTE, 0, 0, 0, 0.0f, 1, 1, 1, 1.0f / (float)++n);
   }
+  gfx_cor((GfxRect){0,0,NV_TELA_W,NV_TELA_H},0,VEU_BORRADA[0],VEU_BORRADA[1],VEU_BORRADA[2],VEU_BORRADA[3]);
   gfx_tex_aspect_atual = aspAnt; gfx_arte_opaca_atual = opAnt;
 }
 // Avisos de uma vez por sessao: porque a Borrada nao saiu pelo caminho normal.
@@ -245,9 +246,9 @@ static void depoisDaBorrada(GLuint t, const Borrada *b, float a) {
     for (j = 0; j < 3; j++) {
       float fonte = temPq ? pq[i][j] / 255.0f : temCd ? cd[i][j] / 255.0f : F[j];
       int dt, da, dv;
-      ref[i][j] = (fonte * (1.0f - VEU_BORRADA[3]) + VEU_BORRADA[j] * VEU_BORRADA[3]) * 255.0f;
+      ref[i][j] = temPq ? pq[i][j] : (fonte * (1.0f - VEU_BORRADA[3]) + VEU_BORRADA[j] * VEU_BORRADA[3]) * 255.0f;
       dt = abs((int)tela[i][j] - (int)(ref[i][j] + 0.5f));
-      da = temPq && temCd ? abs((int)pq[i][j] - (int)cd[i][j]) : 0;
+      da = temPq && temCd ? abs((int)pq[i][j] - (int)(cd[i][j]*(1-VEU_BORRADA[3])+255*VEU_BORRADA[j]*VEU_BORRADA[3])) : 0;
       dv = abs((int)(fonte * 255.0f + 0.5f) - nivel(F[j]));
       if (dt > erroTela) erroTela = dt;
       if (da > erroAssado) { erroAssado = da; iPior = i; }
@@ -296,7 +297,7 @@ static int borrada(GfxRect r, float raioPx, const char *c, float a) {
       // lento da arte desfocada sai em faixas de 8 bits no OLED (dono, 11/10,
       // fotos1014/gradiente-banding.jpg).
       if (ultimo && ultimoH == h && glIsTexture(ultimo)) {
-        gfx_luz_canal_desenhar(ultimo, a, VEU_BORRADA, 1);
+        gfx_luz_canal_desenhar(ultimo, a, NULL, 1);
         return 1;
       }
       avisoBorrada(&avisoSemCopia, "sem a copia desfocada da arte ainda (arte nao decodificada?): fundo liso");
@@ -305,13 +306,14 @@ static int borrada(GfxRect r, float raioPx, const char *c, float a) {
       return 1;
     }
     if (conferido[K_BORRADA] != 0) {
-      float k[9];
+      float k[13];
       k[0] = (float)(b.d & 0xffffu); k[1] = (float)(b.d >> 16);
       k[2] = (float)(h & 0xffffu);   k[3] = (float)(h >> 16);
       k[4] = b.asp;
       k[5] = NV_COR_FUNDO_R; k[6] = NV_COR_FUNDO_G; k[7] = NV_COR_FUNDO_B;
-      k[8] = 1.0f;   // versao do desenho: 1 = a copia desfocada
-      t = gfx_luz_canal(CANAL_BORRADA, k, 9, pintarBorrada, &b);
+      k[8] = 2.0f; /* includes the veil */
+      for (int j=0;j<4;j++) k[9+j]=VEU_BORRADA[j];
+      t = gfx_luz_canal(CANAL_BORRADA, k, 13, pintarBorrada, &b);
     }
     if (t) {
       // PONTILHADO (uPar.x = 1 no GFX_SNAP, o nv_dither de gfx.c): o quadro
@@ -319,8 +321,9 @@ static int borrada(GfxRect r, float raioPx, const char *c, float a) {
       // arte desfocada quantizava em faixas largas no OLED — o mesmo caminho
       // do Frost (pontilhar 1) e do Cinema (dfae93b2). Ruido +-1/255, parado,
       // ~6 ALU: barato no GLES2 de webOS/Tizen/Android.
-      gfx_luz_canal_desenhar(t, a, VEU_BORRADA, 1);
       ultimo = t; ultimoH = h;
+      if (a >= .999f && !podeConferir(K_BORRADA,t,a) && !despejoDevido(K_BORRADA,a) && gfx_luz_canal_adiar(t,1)) return 1;
+      gfx_luz_canal_desenhar(t, a, NULL, 1);
     } else {
       // DESENHO DIRETO: a copia em cover na tela e o veu por cima (uma tela
       // misturada a mais). Sem quadro pequeno, ou a conferencia errou.

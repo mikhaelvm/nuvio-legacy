@@ -316,7 +316,7 @@ int prog_gravar_local(const char *imdb, int temporada, int episodio,
   return ok;
 }
 
-int prog_aplicar_remoto(const ProgRegistro *rem) {
+static int aplicarRemoto(const ProgRegistro *rem) {
   ProgRegistro r;
   int i;
   if (!rem || !rem->contentId[0] || !temposValidos(rem->posSeg, rem->durSeg) ||
@@ -329,24 +329,50 @@ int prog_aplicar_remoto(const ProgRegistro *rem) {
   if (r.posSeg < 0) r.posSeg = 0;
   if (!r.chave[0]) prog_chave(r.chave, sizeof r.chave, r.contentId, r.temporada, r.episodio);
   if (!r.tipo[0]) snprintf(r.tipo, sizeof r.tipo, "%s", r.episodio > 0 ? "series" : "movie");
-  TRANCAR();
-  carregar();
   i = achar(r.perfil, r.chave);
   // `tocou` nao viaja: posicao de outro aparelho e desconhecida (-1), salvo o
   // eco do proprio push (mesma posicao e duracao, updated_at mais novo).
   r.tocou = i >= 0 && fabs(r.posSeg - regs[i].posSeg) <= 5.0 &&
             fabs(r.durSeg - regs[i].durSeg) < 1.0 ? regs[i].tocou : -1;
   if (i >= 0) {
-    if (regs[i].pendente || r.lastWatchedMs <= regs[i].lastWatchedMs) { DESTRANCAR(); return 0; }
+    if (regs[i].pendente || r.lastWatchedMs <= regs[i].lastWatchedMs) { return 0; }
   } else {
     i = abrirVaga();
-    if (i < 0) { DESTRANCAR(); return 0; }
+    if (i < 0) { return 0; }
     if (i == nRegs) nRegs++;
   }
   regs[i] = r;
-  gravar();
-  DESTRANCAR();
   return 1;
+}
+
+// Atomic import: one durable checkpoint for the whole server response. The
+// caller holds its profile-session guard. Failed writes leave memory retryable.
+int prog_aplicar_remotos(const ProgRegistro *rem, int n, unsigned char *aceitou) {
+  ProgRegistro *antes;
+  int total = 0, nAntes;
+  if (!rem || n < 1 || n > PROG_MAX) return 0;
+  if (aceitou) memset(aceitou, 0, (size_t)n);
+  antes = malloc(sizeof regs);
+  if (!antes) return 0;
+  TRANCAR();
+  carregar();
+  memcpy(antes, regs, sizeof regs); nAntes = nRegs;
+  for (int i = 0; i < n; i++) {
+    int ok = aplicarRemoto(&rem[i]);
+    if (aceitou) aceitou[i] = (unsigned char)ok;
+    total += ok;
+  }
+  if (total && !gravar()) {
+    memcpy(regs, antes, sizeof regs); nRegs = nAntes;
+    if (aceitou) memset(aceitou, 0, (size_t)n);
+    total = 0;
+  }
+  DESTRANCAR();
+  free(antes);
+  return total;
+}
+int prog_aplicar_remoto(const ProgRegistro *rem) {
+  return prog_aplicar_remotos(rem, 1, NULL);
 }
 
 int prog_tocou(const char *imdb) {

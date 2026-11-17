@@ -638,7 +638,7 @@ void corviva_quadro(float dt, int modo, int usarLogo, int reduzido) {
   const CorvivaPaleta *fonte;
   if (dt < 0.0f) dt = 0.0f;
   relogio += (double)dt * 1000.0;
-  nv_tempo_viva = reduzido ? 0.0f : (float)(relogio / 1000.0);
+  nv_tempo_viva = 0.0f; // Static gradient; palette still follows settings and artwork.
 
   // O pedido do quadro que ACABOU de ser desenhado vira o pendente.
   if (pedidoPrio) {

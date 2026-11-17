@@ -37,6 +37,7 @@ void contalib_filtros(int (*lista)(const char *id, long long ms),
 static ContaLibItem *itens;
 static int nItens;
 static ContaVisto *vistos;
+static char *vistosUltimoJson; /* exact response cache; scoped and cleared with profile */
 static int nVistos;
 // So a TROCA do vetor de vistos e a copia das sementes (fio da descoberta)
 // passam por aqui. O resto deste modulo e do fio principal.
@@ -51,7 +52,7 @@ static int temConta;
 // zero itens e um estado real (arranque sem cache), e -1 garante que a primeira
 // conferencia com o catalogo ja publicado nao seja confundida com "igual".
 static int aplicado, marcaIdx = -1, marcaCatN = -1;
-static char marcaId[24];
+static char marcaId[64];
 
 // ---------------------------------------------------------------- leitura
 
@@ -272,10 +273,10 @@ int contalib_ler_biblioteca(const char *json) {
       if (j == k) {
         // Um '+' de lista PENDENTE nesta TV vence a remocao do espelho local
         // ate subir: sem isto o snapshot apagava um salvo feito aqui.
-        if (contapend_lista_pendente && contapend_lista_pendente(itens[i].id)) continue;
+        if (contapend_lista_pendente(itens[i].id)) continue;
         int idx = cat_indice_por_imdb(itens[i].id);
         if (idx >= 0) cat_definir_na_lista(idx, 0);
-        if (salvos_remover_remoto) salvos_remover_remoto(itens[i].id);
+        salvos_remover_remoto(itens[i].id);
       }
     }
   free(itens);
@@ -295,6 +296,15 @@ int contalib_ler_vistos(const char *json) {
   ContaVisto *novo;
   const char *p;
   int total, k = 0;
+
+  pthread_mutex_lock(&vistosTrava);
+  if (json && vistosUltimoJson && !strcmp(json, vistosUltimoJson)) {
+    int n = nVistos;
+    vistosPuxadoEm = time(NULL);
+    pthread_mutex_unlock(&vistosTrava);
+    return n;
+  }
+  pthread_mutex_unlock(&vistosTrava);
 
   total = contarLinhas(json);
   if (total < 1) return nVistos > 0 ? -1 : 0;
@@ -321,6 +331,8 @@ int contalib_ler_vistos(const char *json) {
     vistosRev++;
   free(vistos);
   vistos = novo;
+  free(vistosUltimoJson);
+  vistosUltimoJson = json ? strdup(json) : NULL;
   nVistos = k;
   vistosPuxadoEm = time(NULL);
   pthread_mutex_unlock(&vistosTrava);
@@ -490,9 +502,8 @@ int contalib_aplicar_vistos(void) {
       // Only a watched_at newer than the gesture can mark the episode again.
       VistoFonte um;
       memset(&um, 0, sizeof um);
-      int estado = contapend_estado ?
-          contapend_estado(vistos[i].id, vistos[i].tipo, vistos[i].temporada, vistos[i].episodio,
-                           vistos[i].vistoMs, -1) : 1;
+      int estado = contapend_estado(vistos[i].id, vistos[i].tipo, vistos[i].temporada, vistos[i].episodio,
+                                    vistos[i].vistoMs, -1);
       if (estado < 0) estado = 1;
       vistoep_fonte(vistos[i].id, vistos[i].temporada, vistos[i].episodio,
                     estado, vistos[i].vistoMs, &um);
@@ -554,6 +565,7 @@ void contalib_esquecer(void) {
   pthread_mutex_lock(&vistosTrava);
   free(vistos);
   vistos = NULL;
+  free(vistosUltimoJson); vistosUltimoJson = NULL;
   nVistos = 0;
   vistosPuxadoEm = 0;
   vistosRev++;

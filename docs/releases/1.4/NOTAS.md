@@ -24,6 +24,6 @@ Episodes: the player stops picking up the previous episode's sources, the carous
 - The TorBox route that creates the torrent uses `multipart/form-data` because that is what the official SDK sends; if a TorBox source fails, please send a log.
 
 ## Packages
-- `space.nuvio.native.legacy_1.4.0_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.4.0_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.4.0_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.4.0_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.4.0-tizen.wgt` — Samsung Tizen (WASM).

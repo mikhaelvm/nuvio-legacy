@@ -21,8 +21,14 @@ static void desenhaEm(float esc, const char *a, const char *b) {
 int main(void) {
   SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
   assert(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == 0);
+#ifdef __linux__
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+#endif
   SDL_Window *win = SDL_CreateWindow("t", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
   assert(win);
   SDL_GLContext gl = SDL_GL_CreateContext(win); assert(gl);
@@ -62,6 +68,27 @@ int main(void) {
     TxtLinha l = txt_linha(TXT_BODY, "Nova escala", 255, 255, 255, 255);
     gfx_escala_sair(ant);
     assert(l.w > 0 && l.tex); }
+  txt_novo_quadro();
+  TxtLinha borda = txt_linha_familia(TXT_BODY, "Legendas Netflix: ação e coração", 0, 0, 0, 255, TXT_FAMILIA_NETFLIX);
+  assert(borda.tex);
+  gfx_opacidade_grupo = .7f;
+  gfx_n_rect = 0; txt_desenhar_borda(borda, 20, 40, 3, 1);
+  assert(gfx_opacidade_grupo == .7f);
+  assert(gfx_n_rect >= 18);
+  gfx_n_rect = 0; txt_desenhar_borda(borda, 30, 50, 3, .5f);
+  assert(gfx_n_rect == 1);
+  gfx_n_rect = 0; txt_desenhar_borda(borda, 30, 50, 2, .5f);
+  assert(gfx_n_rect >= 10);
+  gfx_n_rect = 0; txt_desenhar_borda(borda, 30, 50, 3, 1);
+  assert(gfx_n_rect == 1);
+  gfx_opacidade_grupo = 1;
+  txt_aliviar(); txt_novo_quadro();
+  borda = txt_linha_familia(TXT_BODY, "Outra legenda", 0, 0, 0, 255, TXT_FAMILIA_NETFLIX);
+  assert(borda.tex); gfx_n_rect = 0;
+  txt_desenhar_borda(borda, 30, 50, 3, 1); assert(gfx_n_rect >= 18);
+  puts("PASS Netflix border cache: reuse, position/opacity, style, memory-pressure invalidation");
+  txt_encerrar(); gfx_encerrar();
+  SDL_GL_DeleteContext(gl); SDL_DestroyWindow(win); SDL_Quit();
   puts("ok");
   return 0;
 }

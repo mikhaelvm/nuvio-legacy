@@ -23,6 +23,6 @@ Samsung: no more out-of-memory crash from 4K backdrops, and a lighter start. Pla
 - When the app did not close cleanly, the next start logs what the previous session last did (went to background, was visible, memory), so a crash can be told apart from the TV closing the app.
 
 ## Packages
-- `space.nuvio.native.legacy_1.4.1_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.4.1_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.4.1_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.4.1_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.4.1-tizen.wgt` — Samsung Tizen (WASM), unsigned; sign it with your own certificate as before.

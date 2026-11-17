@@ -26,7 +26,6 @@
 #include "plrilha.h"
 #include "ctxmenu.h"
 #include "epcoment.h"
-#include "reacao.h"
 #include "movimento.h"
 #define NV_ESCALA_TELA   // o arquivo inteiro mede pela tela virtual (escala.h)
 #include "escala.h"
@@ -79,11 +78,6 @@ static void focoLinhaPasso(float dt) {
   segFoc = red ? (grupo == 0 ? 1.0f : 0.0f)
                : anim_mola(segFoc, grupo == 0 ? 1.0f : 0.0f, dt, NV_MOLA_FOCO);
 }
-#ifdef NV_TOUCH_UI
-static ToqueRolagem toqueEp, toqueEpTemporadas;
-static float toqueEpTemporadasOffset;
-static int toqueEpRolar(const PonteiroRolagem *e);
-#endif
 static int localizarAtual;
 // ONDE O FOCO TEM DE ESTAR, POR NUMERO DE EPISODIO — issue #102.
 //
@@ -114,7 +108,7 @@ static int semMolaScroll;
 // este menu, entao ele precisa carregar a porta que tomou. Dentro da folha de
 // episodios a opcao nao existe — quem abriu a folha veio do player e ja tem
 // fonte tocando; oferece-la ali seria uma linha que nao leva a lugar nenhum.
-enum { VM_ESTE = 0, VM_ATE, VM_TEMP, VM_FONTES, VM_DAQUI, VM_SINOPSE, VM_NOTA, VM_COMENT, VM_N };
+enum { VM_ESTE = 0, VM_ATE, VM_TEMP, VM_FONTES, VM_DAQUI, VM_SINOPSE, VM_COMENT, VM_N };
 static int vmAcoes[VM_N], vmN; // linhas visiveis -> gesto (daqui em diante e opcional)
 // O MENU DA TEMPORADA (issue #108, "Pressing 'Season' brings up option to mark
 // all as watched"): o mesmo cartao, aberto pela ABA e nao por um episodio, com
@@ -231,9 +225,6 @@ static void montarRotulos(void) {
     } else if (modo == VM_TEMP) {
       snprintf(vmRot[i], sizeof vmRot[i], quantos == 1 ? i18n("Temporada inteira (%d episódio)") : i18n("Temporada inteira (%d episódios)"), quantos);
       ic = "aj_list-video";
-    } else if (modo == VM_NOTA) {
-      snprintf(vmRot[i], sizeof vmRot[i], "%s", i18n("Sua nota"));
-      ic = "aj_star";
     } else if (modo == VM_COMENT) {
       snprintf(vmRot[i], sizeof vmRot[i], "%s", i18n("Comentários"));
       ic = "aj_message-square";
@@ -292,7 +283,6 @@ static void menuAbrir(int idx, int t, int e, const char *nome, int so) {
       }
   }
   vmAcoes[vmN++] = VM_TEMP;
-  if (so && e > 0) vmAcoes[vmN++] = VM_NOTA;
   if (so) vmAcoes[vmN++] = VM_FONTES;
   vmSinopse[0] = 0;
   if (e > 0) {
@@ -454,9 +444,6 @@ static void menuAbrirTemporada(int idx, int t, int so) {
 }
 
 void episodios_abrir(int idx, int t, int e) {
-#ifdef NV_TOUCH_UI
-  toquerol_limpar(&toqueEp); toquerol_limpar(&toqueEpTemporadas); toqueEpTemporadasOffset = 0;
-#endif
   titulo = idx; atualT = t; atualE = e; aberto = 1;
   guardarId(idTitulo, sizeof idTitulo, idx);
   temporada = foco = 0; grupo = 1; pedidoE = 0; scroll = 0;
@@ -668,7 +655,6 @@ static void menuDesenhar(GfxRect area, float a0) {
   else if (vmFoco<0) meta = "← / →";
   else if (vmAcoes[vmFoco] == VM_COMENT) meta = extras_comentarios_ep_tmdb() ? "TMDB · reviews da série" : "Comentários do Trakt";
   else if (vmAcoes[vmFoco] == VM_SINOPSE) meta = "Ler sinopse";
-  else if (vmAcoes[vmFoco] == VM_NOTA) meta = "Sua nota";
   else meta = vmAcoes[vmFoco] != VM_DAQUI && vmVisto ? "Marcar como assistido" : "Desmarcar como assistido";
   float content=a;
   if (vmSo && !vmModoTemp) {
@@ -745,9 +731,6 @@ static void menuEvento(const SDL_Event *ev) {
     if (vmFoco<0) { vmFoco=0; return; }
     int modo = vmAcoes[vmFoco], v = modo == VM_DAQUI ? 0 : vmVisto;
     if (modo == VM_COMENT) { epcoment_entrar(); return; }
-    if (modo == VM_NOTA) {
-      reacao_episodio_abrir(cat_item(vmIdx), vmT, vmE); vmAberto = 0; return;
-    }
     if (modo == VM_FONTES) { vmFontesPed = 1; vmAberto = 0; return; }
     if (modo == VM_SINOPSE) { sinopse_abrir(vmNome, vmSinopse); vmAberto = 0; return; }
     menuFeito(aplicarVisto(modo, v), v);
@@ -758,9 +741,6 @@ static void menuEvento(const SDL_Event *ev) {
 }
 
 void episodios_evento(const SDL_Event *ev) {
-#ifdef NV_TOUCH_UI
-  if (toquerol_navegacao(ev)) { toquerol_limpar(&toqueEp); toquerol_limpar(&toqueEpTemporadas); }
-#endif
   if (!aberto) return;
   revalidar();
   if (sinopse_aberta()) { sinopse_evento(ev); return; }
@@ -899,9 +879,6 @@ void episodios_atualizar(float dt) {
     // A PRIMEIRA LINHA E A ANTERIOR A QUE TOCA (mockup do Glass UI): a pessoa
     // ve de onde veio e o que vem, e o foco fica na segunda linha.
     localizarAtual = 0; semMolaScroll = 1;
-#ifdef NV_TOUCH_UI
-    if (!toquerol_livre(&toqueEp))
-#endif
     scroll = foco > 0 ? (float)(foco - 1) * EP_ROW : 0.0f;
   }
   if (foco >= n) foco = n > 0 ? n - 1 : 0;
@@ -915,10 +892,6 @@ void episodios_atualizar(float dt) {
   if((foco+1)*EP_ROW>scroll+area) alvo=(foco+1)*EP_ROW-area;
   if (alvo > max) alvo = max;
   if (alvo < 0) alvo = 0;
-  #ifdef NV_TOUCH_UI
-  if (toquerol_livre(&toqueEp)) { scroll = toquerol_clamp(scroll, 0.0f, max > 0 ? max : 0); velScroll = 0.0f; }
-  else
-  #endif
   if (semMolaScroll) { scroll = alvo; velScroll = 0.0f; }
   else scroll = anim_mola2(&velScroll, scroll, alvo, dt, NV_MOLA2_SCROLL);
   semMolaScroll = 0;
@@ -936,9 +909,6 @@ static void ponteiroEpTemporada(int i, int b) {
   grupo = 0;
   if (i == temporada) return;
   temporada = i; foco = 0; scroll = 0;
-#ifdef NV_TOUCH_UI
-  toquerol_limpar(&toqueEp);
-#endif
   localizarAtual = 0; semMolaScroll = 1;
   desc_episodios(titulo, numTemporada(temporada));
 }
@@ -1047,46 +1017,6 @@ static void linhaEp(int i, const CatItem *ci, float lx, float lw, float y, float
   }
 }
 
-#ifdef NV_TOUCH_UI
-static int toqueEpRolar(const PonteiroRolagem *e) {
-  int r;
-  if (!aberto || vmAberto) return 0;
-  r = toquerol_evento(e->eixoY ? &toqueEp : &toqueEpTemporadas, e);
-  if (r) { if (e->eixoY) velScroll = 0.0f; vmSegurando = 0; }
-  return r;
-}
-static float toqueEpTemporada(int i, int desenhar, float x, float y, float a) {
-  char nome[40], numero[16];
-  const char *rot[1] = {nome};
-  int t = numTemporada(i), n = 0, cont[1], sel = i == temporada, foc = sel && grupo == 0;
-  float sw;
-  for (int k = 0; k < cat_n_episodios(titulo); k++) {
-    const CatEp *e = cat_episodio(titulo, k);
-    if (e && e->temporada == t) n++;
-  }
-  cont[0] = n > 0 ? n : -1;
-  snprintf(nome, sizeof nome, i18n("Temporada %d"), t);
-  sw = plrui_seg(rot, cont, 1, -1, 0, -1, 0, a);
-  if (desenhar) {
-    int cor = foc ? plrui_tinta() : 243;
-    TxtLinha lt = txt_linha(TXT_ILHA_SEG, nome, cor, cor, cor, foc || sel ? 255 : 140);
-    GfxRect r = {x + 5, y + 5, sw - 10, 44};
-    /* plrui_seg reserves negative x for measurement; draw the moving pill
-     * explicitly so a partly visible pill also renders left of the origin. */
-    gfx_cor((GfxRect){x, y, sw, 54}, .5f, .114f, .118f, .137f, a);
-    if (foc) plrui_pilula_foco(r, a);
-    else if (sel) gfx_cor(r, .5f, .204f, .212f, .243f, a);
-    txt_desenhar_alpha(lt, x + 25, y + 5 + (44 - lt.h) * .5f, a);
-    if (n > 0) {
-      TxtLinha ln;
-      snprintf(numero, sizeof numero, "%d", n);
-      ln = txt_linha(TXT_ILHA_NUM, numero, cor, cor, cor, foc ? 150 : 89);
-      txt_desenhar_alpha(ln, x + 25 + lt.w + 9, y + 5 + (44 - lt.h) * .5f + lt.h - ln.h - 1, a);
-    }
-  }
-  return sw;
-}
-#endif
 static void corpoIlha(GfxRect c, float a, void *u) {
   const CatItem *ci;
   GfxRect ilha = { c.x, c.y - 64.0f, c.w, c.h + 64.0f };
@@ -1112,31 +1042,6 @@ static void corpoIlha(GfxRect c, float a, void *u) {
   y += EP_TIT_H + 14.0f;
   // TEMPORADAS no segmentado, com a contagem de episodios das que a lista ja
   // tem; uma janela que cabe na ilha, comecando antes da selecionada.
-#ifdef NV_TOUCH_UI
-  if (telefoneui_ativo()) {
-    float total = 0, selecionada = 0, vista = w - 20.0f, sx = x0 + 10;
-    GfxRect regiao = {sx, y, vista, EP_SEG_H};
-    for (i = 0; i < nTemporadas(); i++) {
-      if (i == temporada) selecionada = total;
-      total += toqueEpTemporada(i, 0, 0, 0, a) + 4;
-    }
-    if (!toquerol_livre(&toqueEpTemporadas)) toqueEpTemporadasOffset = fminf(selecionada, fmaxf(0, total - vista));
-    toquerol_vincular(&toqueEpTemporadas, regiao, gfx_escala(), 0, total - vista, 0, &toqueEpTemporadasOffset);
-    gfx_recorte(sx, y, vista, EP_SEG_H);
-    sx -= toqueEpTemporadasOffset;
-    for (i = 0; i < nTemporadas(); i++) {
-      float sw, l, d;
-      sw = toqueEpTemporada(i, 1, sx, y, a);
-      l = fmaxf(sx, regiao.x); d = fminf(sx + sw, regiao.x + regiao.w);
-      if (ptr && d > l) {
-        ponteiro_alvo(l, y + 5, d - l, 44, NULL, ponteiroEpTemporada, i, 0);
-        ponteiro_alvo_segurar(ponteiroEpTemporada);
-      }
-      sx += sw + 4;
-    }
-    gfx_recorte(ilha.x, ilha.y, ilha.w, ilha.h);
-  } else
-#endif
   { const char *rot[8];
     char nomes[8][40];
     int cont[8], ns = 0, ini = temporada > 1 ? temporada - 1 : 0;
@@ -1159,11 +1064,6 @@ static void corpoIlha(GfxRect c, float a, void *u) {
   y += EP_SEG_H + 14.0f;
   topo = y; base = y + alturaLista();
   n = nLinhas();
-  #ifdef NV_TOUCH_UI
-  toquerol_vincular(&toqueEp, (GfxRect){c.x, topo, c.w, base - topo},
-                   gfx_escala(), 0.0f, n * EP_ROW - (base - topo), 1, &scroll);
-  if (ptr && telefoneui_ativo()) ponteiro_rolagem(toqueEpRolar);
-  #endif
   gfx_recorte(c.x, topo - 4.0f, c.w, base - topo + 4.0f);
   for (i = 0; i < n; i++) {
     float yl = topo + i * EP_ROW - scroll;

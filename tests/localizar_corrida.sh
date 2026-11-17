@@ -20,6 +20,6 @@ cc ${flags[@]+"${flags[@]}"} -DNV_CAT_TEST_ANTES_TRAVA=nv_cat_teste_antes_trava 
   src/catalogo.c src/cwordem.c tests/localizar_corrida.c src/cotacat.c \
   src/js.c src/metaprov.c src/colecoes.c src/redeurl.c src/catordem.c src/artefontes.c \
   -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -o "$bin" -O1 -g -pthread \
+  -o "$bin" -O1 -g -ffunction-sections -fdata-sections -Wl,--gc-sections -pthread \
   -Wall -Wno-deprecated-declarations -Wno-macro-redefined
 "$bin"

@@ -144,8 +144,7 @@ int vistoep_fonte(const char *imdb, int temporada, int episodio, int visto,
                   long long remotoMs, VistoFonte *c) {
   int ok, juiz = 0;
   // Both remote states must respect persisted gestures, including restored marks.
-  if (contapend_estado)
-    visto = contapend_estado(imdb, "series", temporada, episodio, remotoMs, visto);
+  visto = contapend_estado(imdb, "series", temporada, episodio, remotoMs, visto);
   if (visto && lapBarra) juiz = lapBarra(imdb, temporada, episodio, remotoMs);
   if (juiz > 0) visto = 0;
   pthread_mutex_lock(&trava);

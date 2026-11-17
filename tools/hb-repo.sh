@@ -8,7 +8,7 @@
 # SEM SERVIDOR: os dois arquivos vao ANEXADOS a release, e a URL que a pessoa
 # cadastra no canal e a de "ultima release" do GitHub, que redireciona sempre
 # para a mais nova:
-#   https://github.com/iqui27/nuvio-native-legacy/releases/latest/download/repo.json
+#   https://github.com/mikhaelvm/nuvio-legacy/releases/latest/download/repo.json
 #
 # Uso: bash tools/hb-repo.sh <pacote.ipk> <pasta-de-saida>
 # Gera <saida>/webosbrew.manifest.json e <saida>/repo.json. Publica-los e
@@ -18,7 +18,7 @@ cd "$(dirname "$0")/.."
 
 IPK="${1:?uso: hb-repo.sh <pacote.ipk> <saida>}"
 SAIDA="${2:?uso: hb-repo.sh <pacote.ipk> <saida>}"
-REPO="iqui27/nuvio-native-legacy"
+REPO="mikhaelvm/nuvio-legacy"
 mkdir -p "$SAIDA"
 
 python3 - "$IPK" "$SAIDA" "$REPO" <<'EOF'
@@ -38,7 +38,7 @@ manifesto = {
     "id": app["id"],
     "version": versao,
     "type": "native",
-    "title": "Nuvio (native legacy)",
+    "title": app["title"],
     "appDescription": "Unofficial native Nuvio client for LG webOS",
     "iconUri": icone,
     "sourceUrl": f"https://github.com/{repo}",

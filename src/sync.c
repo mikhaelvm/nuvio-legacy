@@ -22,7 +22,6 @@ void servidores_esquecer_todos(void);   // servidores.c: wipe every profile's to
 #include "visto.h"
 #include "salvosorg.h"
 #include "salvos.h"
-#include "mapa.h"
 #include "recomenda.h"
 #include "fontepref.h"
 #include "fontevolta.h"
@@ -39,6 +38,7 @@ void servidores_esquecer_todos(void);   // servidores.c: wipe every profile's to
 #include "syncprog.h"
 #include "contapend.h"
 #include "ajustes.h"
+#include "selospacote.h"
 #include "idioma.h"
 #include "catordem.h"
 #include "catordemcache.h"
@@ -68,6 +68,10 @@ void servidores_esquecer_todos(void);   // servidores.c: wipe every profile's to
 
 static pthread_t fio;
 static int fioVivo, fioPronto;
+static int rapidoVivo, rapidoPronto, rapidoResultado;
+static unsigned rapidoEm;
+static NvPerfilSessao rapidoSessao;
+static int rapidoPerfil;
 // A ENTREGA DO FIO DE SYNC PARA O PRINCIPAL (#203). `fioPronto` e
 // `addonsCedo` sao porteiras: o fio enche buffers (catHomeBlob, colBlob,
 // addonsRem...) e SO DEPOIS liga a porteira; o principal ve a porteira e
@@ -1501,6 +1505,13 @@ static int manualPedido, manualRodando, manualResultado, manualAdd, manualRem, m
 static AddonRemoto manualAntes[SY_ADD_MAX];
 static int manualAntesN;
 
+static void *rodarProgressoRapido(void *u) {
+  (void)u;
+  rapidoResultado = syncprog_puxar_sessao(rapidoPerfil, rapidoSessao);
+  __atomic_store_n(&rapidoPronto, 1, __ATOMIC_RELEASE);
+  return NULL;
+}
+
 void sync_iniciar(void) {
   plugins_perfil_mudou();   // conta/perfil novos: estado e geracao dos plugins
   colfileiras_contexto();
@@ -1521,7 +1532,7 @@ void sync_iniciar(void) {
   // sync_periodico, cinco minutos depois (o ciclo interrompido marca
   // SYNC_PRONTO e conta como `ultimoOk`). sync_passo decide, quando o fio
   // acabar, se precisa de outra volta.
-  if (fioVivo) { pedidoComFioVivo = 1; return; }
+  if (fioVivo || rapidoVivo) { pedidoComFioVivo = 1; return; }
   pedidoComFioVivo = 0;
   if (nuvem_freio_ativo()) return;
   ajustesDetectarMudancas();
@@ -1551,7 +1562,7 @@ void sync_iniciar(void) {
 // com o decodificador, e um engasgo de imagem custa mais que 5 minutos de
 // atraso no progresso.
 int sync_periodico(unsigned agoraMs) {
-  if (!sessao_logada() || fioVivo) return 0;
+  if (!sessao_logada() || fioVivo || rapidoVivo) return 0;
   if (nuvem_freio_ativo()) return 0;
   // Sem nenhum ciclo bem-sucedido ainda, quem manda e quem chamou sync_iniciar
   // — nao adianta insistir por cima de uma falha que o freio ja esta segurando.
@@ -1559,7 +1570,18 @@ int sync_periodico(unsigned agoraMs) {
   // Com o servidor da conta fora do ar, a volta seguinte vem antes: e ela que
   // troca a copia pela resposta de verdade quando ele voltar. O freio de
   // nuvem.c (acima) continua mandando no ritmo das tentativas.
-  if (agoraMs - ultimoOk < (foraHttp ? SYNC_RETENTA_MS : SYNC_INTERVALO_MS)) return 0;
+  if (agoraMs - ultimoOk < (foraHttp ? SYNC_RETENTA_MS : SYNC_INTERVALO_MS)) {
+    if (!foraHttp && agoraMs - rapidoEm >= 30000u && !perfis_precisa_escolher()) {
+      pthread_t t;
+      rapidoEm = agoraMs;
+      rapidoSessao = nv_perfil_sessao_ler(); rapidoPerfil = perfis_ativo();
+      __atomic_store_n(&rapidoPronto, 0, __ATOMIC_RELAXED);
+      if (pthread_create(&t, NULL, rodarProgressoRapido, NULL) == 0) {
+        rapidoVivo = 1; pthread_detach(t); return 1;
+      }
+    }
+    return 0;
+  }
   sync_iniciar();
   return 1;
 }
@@ -1630,6 +1652,13 @@ static int aplicarEstruturaDaConta(int medir) {
 }
 
 void sync_passo(unsigned agoraMs) {
+  if (rapidoVivo && __atomic_load_n(&rapidoPronto, __ATOMIC_ACQUIRE)) {
+    rapidoVivo = 0;
+    if (nv_perfil_sessao_atual(rapidoSessao) && rapidoPerfil == perfis_ativo()) {
+      if (rapidoResultado >= 0 && syncprog_aplicar(NULL) > 0) desc_refazer_continuar();
+    } else syncprog_esquecer();
+    if (pedidoComFioVivo) sync_iniciar();
+  }
   if (sessao_logada()) desc_sessao_passo();
   // Consome apenas uma resposta da conta/perfil que a pediu. A rede segue no
   // mesmo fio de sempre; uma colecao lenta nao segura o progresso recebido.
@@ -1828,7 +1857,8 @@ void sync_passo(unsigned agoraMs) {
   // ela nao existia: era a mesma queixa do issue por outro angulo.
   if (temVistosBlob && vistosBlob) {
     unsigned rev = contalib_vistos_revisao();
-    if (contalib_ler_vistos(vistosBlob) > 0 && !trakt_ativo())
+    if (contalib_ler_vistos(vistosBlob) > 0 &&
+        rev != contalib_vistos_revisao() && !trakt_ativo())
       contalib_aplicar_vistos();
     free(vistosBlob); vistosBlob = NULL; temVistosBlob = 0;
     // O "a seguir" da conta (issue #199) sai destes vistos. Vistos novos e
@@ -1890,8 +1920,10 @@ void sync_passo(unsigned agoraMs) {
       // audio da conta nao sao ajuste desta TV: sao o que "Da conta" quer
       // dizer, e linguas.c ja nao os deixa passar por cima da escolha local.
       // Sem isto, quem mexeu em QUALQUER ajuste ficava com "Da conta" = nada.
-      if (!blobAplicado && ajustesBlobPerfil == perfis_ativo())
+      if (!blobAplicado && ajustesBlobPerfil == perfis_ativo()) {
         ajustes_idiomas_da_conta(ajustesBlob);
+        selospacote_conta_do_blob(ajustesBlob);
+      }
     } }
   spMarcar(SP_AJUSTES);
   // Progresso da conta: progresso.c decide linha a linha (pendente local vence,
@@ -1903,7 +1935,7 @@ void sync_passo(unsigned agoraMs) {
     desc_refazer_continuar();
   spMarcar(SP_PROGRESSO);
   spRelatar();
-  if (estado == SYNC_PRONTO) ultimoOk = agoraMs;
+  if (estado == SYNC_PRONTO) { ultimoOk = agoraMs; rapidoEm = agoraMs; }
   // O ciclo parado na pergunta de perfil nao chegou a perguntar nada: o estado
   // do servidor continua o do ciclo anterior.
   if (!cicloInterrompido) {
@@ -2381,8 +2413,7 @@ void sync_esquecer_usuario(void) {
   salvos_esquecer();
   // As categorias e o jeito de ver os Salvos (salvosorg.h) vao junto.
   sorg_esquecer();
-  // O mapa do gosto da Explorar e derivado do historico de quem saiu.
-  mapa_esquecer();
+
   // E A AGENDA: o calendario e os lembretes sao a lista de series de quem
   // saiu, com o dia em que cada uma volta. Mesmo argumento dos salvos, e com o
   // agravante de a tela Agenda mostrar essa lista inteira de uma vez.

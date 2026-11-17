@@ -166,53 +166,18 @@ static float rgSeg(int comNumeros, float x, float yc) {
     q[i] = comNumeros ? (ac ? rgTT(TXT_ILHA_GENERO, num[i]) : rgT(TXT_ILHA_GENERO, num[i])) : (TxtLinha){ 0 };
     w += t[i].w + 40.0f + (i ? 4.0f : 0.0f) + (comNumeros ? 9.0f + q[i].w : 0.0f);
   }
-#ifdef NV_TOUCH_UI
-  float limite = w;
-  if (telefoneui_ativo()) {
-    float estado = 0, selx = 5, selw = 0;
-    if (comNumeros) {
-      char p[64];
-      if (pausado) {
-        if (novas > 0) snprintf(p, sizeof p, i18n("Pausado · %d novas"), novas);
-        else snprintf(p, sizeof p, "%s", i18n("Pausado"));
-        estado = 16 + 18 + 10 + txt_largura(TXT_AJ_CHIP, p) + 16;
-      } else estado = 56 + 14 + 16 + txt_largura(TXT_AJ_CHIP, "Ao vivo") + 20;
-    }
-    limite = fmaxf(120, fminf(w, RP_X + RP_W - 30 - x - (comNumeros ? estado + 16 : 0)));
-    for (i = 0; i < area; i++) selx += t[i].w + 44 + (comNumeros ? 9 + q[i].w : 0);
-    selw = t[area].w + 40 + (comNumeros ? 9 + q[area].w : 0);
-    if (!toqueAreas.livre) {
-      if (selx < toqueAreasOffset) toqueAreasOffset = selx - 5;
-      if (selx + selw > toqueAreasOffset + limite - 5) toqueAreasOffset = selx + selw - limite + 5;
-    }
-    toqueAreasOffset = fmaxf(0, fminf(toqueAreasOffset, fmaxf(0, w - limite)));
-    toquerol_vincular(&toqueAreas, (GfxRect){x, yc - h * .5f, limite, h}, gfx_escala(), 0, w - limite, 0, &toqueAreasOffset);
-    ponteiro_rolagem(toqueRegistroRolar);
-    gfx_recorte(x, yc - h * .5f, limite, h);
-    x -= toqueAreasOffset;
-  }
-#endif
   if (rgVid()) gfx_vidro_folha((GfxRect){ x, yc - h * 0.5f, w, h }, 0.5f, 1);
   else rgNeutro((GfxRect){ x, yc - h * 0.5f, w, h }, h * 0.5f, 0.06f, 0.114f, 0.118f, 0.137f, 1);
   x += 5.0f;
   for (i = 0; i < RG_N; i++) {
     int ac = i == area && segEd;
     float iw = t[i].w + 40.0f + (comNumeros ? 9.0f + q[i].w : 0.0f), al = 0.55f;
-#ifdef NV_TOUCH_UI
-    if (telefoneui_ativo()) {
-      float esquerda = fmaxf(x, x0), direita = fminf(x + iw, x0 + limite);
-      if (direita > esquerda) ponteiro_alvo(esquerda, yc - ih * .5f, direita - esquerda, ih, toqueRegArea, NULL, i, 0);
-    } else ponteiro_alvo(x, yc - ih * 0.5f, iw, ih, toqueRegArea, NULL, i, 0);
-#endif
     if (ac) { rgPilulaAcento((GfxRect){ x, yc - ih * 0.5f, iw, ih }, ih * 0.5f, 1); al = 1; }
     else if (i == area) { rgNeutro((GfxRect){ x, yc - ih * 0.5f, iw, ih }, ih * 0.5f, 0.14f, 0.204f, 0.212f, 0.243f, 1); al = 1; }
     txt_desenhar_alpha(t[i], x + 20, yc - t[i].h * 0.5f, al);
     if (comNumeros) txt_desenhar_alpha(q[i], x + 20 + t[i].w + 9, yc - q[i].h * 0.5f + 1, ac ? 0.6f : 0.35f);
     x += iw + 4.0f;
   }
-#ifdef NV_TOUCH_UI
-  if (telefoneui_ativo()) { gfx_sem_recorte(); return limite; }
-#endif
   return x - x0;
 }
 
@@ -433,34 +398,7 @@ static float rgMascara(float yc, float topo, float base, float fTopo, float fBas
 }
 static void desenhaLista(void) {
   int cabem = (int)((RL_BASE - RL_TOPO) / RL_H), k;
-#ifdef NV_TOUCH_UI
-  float extra = foco >= 0 && foco < nVis && detalhe ? rgAlturaFoco(foco) - RL_H : 0.0f;
-  float total = nVis * RL_H + extra;
-  if (!toqueRegistro.livre) {
-    if (pausado && foco >= 0) {
-      int ini = foco - 11;
-      if (ini > nVis - cabem + 2) ini = nVis - cabem + 2;
-      toqueRegistroOffset = fmaxf(0.0f, ini * RL_H);
-    } else toqueRegistroOffset = fmaxf(0.0f, total - (RL_BASE - RL_TOPO));
-  }
-  toquerol_vincular(&toqueRegistro, (GfxRect){RP_X, RL_TOPO, RP_W, RL_BASE - RL_TOPO}, gfx_escala(),
-                   0.0f, total - (RL_BASE - RL_TOPO), 1, &toqueRegistroOffset);
-  ponteiro_rolagem(toqueRegistroRolar);
-#endif
   gfx_recorte(RP_X, RL_TOPO, RP_W, RL_BASE - RL_TOPO);
-#ifdef NV_TOUCH_UI
-  if (toqueRegistro.livre) {
-    float y = RL_TOPO - toqueRegistroOffset;
-    for (k = 0; k < nVis && y < RL_BASE; k++) {
-      float h = k == foco && detalhe ? rgAlturaFoco(k) : RL_H;
-      if (y + h > RL_TOPO) {
-        rgDesenhaLinha(k, y, 1.0f, k == foco);
-        ponteiro_alvo_faixa(RL_X, y, RL_W, h, RL_TOPO, RL_BASE, toqueRegLinha, NULL, k, 0);
-      }
-      y += h;
-    }
-  } else
-#endif
   if (pausado && foco >= 0) {
     // "topo": a linha em foco a ~11 linhas do topo, as pontas somem em 70.
     int ini = foco - 11, kmax;
@@ -472,9 +410,6 @@ static void desenhaLista(void) {
       float h = (k == foco && detalhe) ? rgAlturaFoco(k) : RL_H;
       float al = k == foco ? 1.0f : rgMascara(y + RL_H * 0.5f, RL_TOPO, RL_BASE, ini > 0 ? 70 : 0, 70);
       rgDesenhaLinha(k, y, al, k == foco);
-#ifdef NV_TOUCH_UI
-      ponteiro_alvo_faixa(RL_X, y, RL_W, h, RL_TOPO, RL_BASE, toqueRegLinha, NULL, k, 0);
-#endif
       y += h;
     }
   } else if (nVis <= cabem) {
@@ -482,18 +417,12 @@ static void desenhaLista(void) {
     float y = RL_TOPO + 6;
     for (k = 0; k < nVis; k++, y += RL_H) {
       rgDesenhaLinha(k, y, rgMascara(y + RL_H * 0.5f, RL_TOPO, RL_BASE, 0, 70), 0);
-#ifdef NV_TOUCH_UI
-      ponteiro_alvo_faixa(RL_X, y, RL_W, RL_H, RL_TOPO, RL_BASE, toqueRegLinha, NULL, k, 0);
-#endif
     }
   } else {
     // Seguindo o fim: empilhada por baixo, o topo some em 90.
     float y = RL_BASE - RL_H;
     for (k = nVis - 1; k >= 0 && y > RL_TOPO - RL_H; k--, y -= RL_H) {
       rgDesenhaLinha(k, y, rgMascara(y + RL_H * 0.5f, RL_TOPO, RL_BASE, 90, 0), 0);
-#ifdef NV_TOUCH_UI
-      ponteiro_alvo_faixa(RL_X, y, RL_W, RL_H, RL_TOPO, RL_BASE, toqueRegLinha, NULL, k, 0);
-#endif
     }
   }
   gfx_sem_recorte();
@@ -627,19 +556,7 @@ static void desenhaEtapas(void) {
   float lx = RP_X + 36, rx = lx + lw + 28, y;
   int i, k = 0, ultimoOk = -1, temAnt = 0, parouAnt = -1, fimAnt = -1;
   char s[120], n1[16];
-#ifdef NV_TOUCH_UI
-  int nAtual = 0, nAnterior = 0;
-  float dy;
-  for (int j = 0; j < nEtapas; j++) if (etapas[j].ant) nAnterior++; else nAtual++;
-  if (!toqueEtapas.livre) toqueEtapasOffset = 0.0f;
-  toquerol_vincular(&toqueEtapas, (GfxRect){RP_X, RL_TOPO, RP_W, RL_BASE - RL_TOPO}, gfx_escala(),
-                   0.0f, fmaxf(nAtual * 62.0f + 44.0f, nAnterior * 62.0f + 304.0f) - (RL_BASE - RL_TOPO), 1, &toqueEtapasOffset);
-  ponteiro_rolagem(toqueRegistroRolar);
-  dy = toqueEtapas.livre ? toqueEtapasOffset : 0.0f;
-  gfx_recorte(RP_X, RL_TOPO, RP_W, RL_BASE - RL_TOPO);
-#else
   float dy = 0.0f;
-#endif
   for (i = 0; i < nEtapas; i++) {
     if (etapas[i].ant) { temAnt = 1; if (etapas[i].k == 'a') parouAnt = i; if (etapas[i].k == 'x') fimAnt = i; }
     else if (etapas[i].k == 'o') ultimoOk = i;
@@ -657,13 +574,8 @@ static void desenhaEtapas(void) {
     if (etapas[i].ant) continue;
     etapas[i].crua = etapaCrua;
     rgEtapa(&etapas[i], lx, y, lw, k == focoEtapa, k > 0);
-#ifdef NV_TOUCH_UI
-    ponteiro_alvo_faixa(lx, y, lw, 62, RL_TOPO, RL_BASE, NULL, toqueRegEtapa, k, 0);
-#endif
     y += 62; k++;
-#ifndef NV_TOUCH_UI
     if (y > RL_BASE - 20) break;
-#endif
   }
   if (temAnt) {
     y = RL_TOPO + 10 - dy;
@@ -677,9 +589,7 @@ static void desenhaEtapas(void) {
       if (!etapas[i].ant) continue;
       rgEtapa(&etapas[i], rx, y, rw, 0, k > 0);
       y += 62; k++;
-#ifndef NV_TOUCH_UI
       if (y > RL_BASE - 260) break;
-#endif
     }
   } else y = RL_TOPO + 10 - dy;
   // A legenda do ambar: o que uma etapa sem fim quer dizer.
@@ -698,9 +608,6 @@ static void desenhaEtapas(void) {
     rgEtapa(&b, rx + 22, cy + 112, rw - 44, 0, 1);
     rgBloco(TXT_ILHA_APOIO, "Um begin sem ok nem fail sai em âmbar: é a etapa em que a sessão parou.",
             rx + 22, cy + 174, rw - 44, 21.75f, 0.5f, 3); }
-#ifdef NV_TOUCH_UI
-  gfx_sem_recorte();
-#endif
 }
 
 // --- O APARELHO -------------------------------------------------------------------
@@ -709,15 +616,7 @@ static void rgAparelho(char *tit, size_t nt, char *sub, size_t ns, char *tvLinha
   char modelo[64] = "", host[48] = "", dot[32] = "", tela[32] = "", os[64] = "";
   int i;
   const char *marca =
-#if defined(NV_TPK) || defined(__EMSCRIPTEN__)
-    "Samsung";
-#elif defined(NV_ANDROID)
-    "Android TV";
-#elif defined(__APPLE__)
-    "";
-#else
     "LG";
-#endif
   if (tvLinha) tvLinha[0] = 0;
   for (i = nLin - 1; i >= 0; i--) if (!strcmp(lin[i].area, "tv")) break;
   if (i >= 0) {
@@ -738,22 +637,11 @@ static void rgAparelho(char *tit, size_t nt, char *sub, size_t ns, char *tvLinha
   else if (!strncmp(host, "android-", 8)) snprintf(os, sizeof os, "Android %s", host + 8);
   else if (host[0]) snprintf(os, sizeof os, "%s", host);
   else snprintf(os, sizeof os, "%s",
-#if defined(NV_TPK) || defined(__EMSCRIPTEN__)
-    "Tizen"
-#elif defined(NV_ANDROID)
-    "Android"
-#elif defined(__APPLE__)
-    "SDL2"
-#else
     "webOS"
-#endif
   );
   { char *x = strchr(tela, 'x');
     if (x && x[1]) { char a[16], b[16]; snprintf(b, sizeof b, "%s", x + 1); *x = 0; snprintf(a, sizeof a, "%s", tela); snprintf(tela, sizeof tela, "%s × %s", a, b); } }
   if (!tela[0] || !strcmp(tela, "-")) snprintf(tela, sizeof tela, "1920 × 1080");
-#ifdef __APPLE__
-  if (!host[0]) { snprintf(tit, nt, "%s", i18n("Prévia no Mac")); snprintf(sub, ns, "%s · %s", os, semFonte ? i18n("log no terminal") : tela); return; }
-#endif
   if (modelo[0] && strcmp(modelo, "-")) snprintf(tit, nt, "%s%s%s", marca, marca[0] ? " " : "", modelo);
   else snprintf(tit, nt, "%s", marca[0] ? marca : "TV");
   if (dot[0] && strcmp(dot, "-")) snprintf(sub, ns, "%s · .NET Core %s · %s", os, dot, tela);
@@ -764,10 +652,6 @@ static float rgDevCard(float x, float y) {
   rgAparelho(t, sizeof t, s, sizeof s, NULL, 0);
   rgNeutro((GfxRect){ x, y, 52, 52 }, 16, 0.08f, RG_CHIP_SOL, 1);
   { int tv = 1;
-#ifdef __APPLE__
-    int i;
-    for (i = 0, tv = 0; i < nLin; i++) if (!strcmp(lin[i].area, "tv")) tv = 1;
-#endif
     rgIcone(tv ? "aj_tv-minimal-play" : "aj_monitor-cog", x + 13, y + 13, 26, 0.82f); }
   { TxtLinha l = rgTC(TXT_AJ_NOME, t, RI_W - 64 - 68); txt_desenhar(l, x + 68, y + 15 - l.h * 0.5f); }
   { TxtLinha l = rgTC(TXT_ILHA_GENERO, s, RI_W - 64 - 68); txt_desenhar_alpha(l, x + 68, y + 43 - l.h * 0.5f, 0.5f); }
@@ -926,9 +810,6 @@ static void inspSessao(void) {
       float by = cy + 20 + 26 + 10 + th + 16;
       TxtLinha l = focoEnviar ? rgTT(TXT_LOG_19B, "Enviar agora") : rgT(TXT_LOG_19B, "Enviar agora");
       float bw = 22 + 20 + 10 + l.w + 22;
-#ifdef NV_TOUCH_UI
-      ponteiro_alvo(x + 22, by, bw, 50, toqueRegEnviar, NULL, 0, 0);
-#endif
       if (focoEnviar) { rgPilulaAcento((GfxRect){ x + 22, by, bw, 50 }, 25, 1); rgIconeT("aj_send", x + 44, by + 15, 20, 1); }
       else { rgNeutro((GfxRect){ x + 22, by, bw, 50 }, 25, 0.08f, RG_CHIP_SOL, 1); rgIcone("aj_send", x + 44, by + 15, 20, 0.85f); }
       txt_desenhar_alpha(l, x + 22 + 52, by + (50 - l.h) * 0.5f, focoEnviar ? 1.0f : 0.85f);
@@ -1166,13 +1047,7 @@ static void inspAparelho(void) {
     if ((p = strstr(etapas[i].tx, "loader=")) != NULL) sscanf(p, "loader=%47s", carreg);
     if (!strncmp(etapas[i].tx, "libcurl-dlopen · ", strlen("libcurl-dlopen · "))) snprintf(curl, sizeof curl, "%s", etapas[i].tx + strlen("libcurl-dlopen · "));
   }
-#if defined(NV_TPK40)
-  snprintf(v, sizeof v, "NuvioTpk40 · %s", NV_VERSAO);
-#elif defined(NV_TPK)
-  snprintf(v, sizeof v, "NuvioTpk · %s", NV_VERSAO);
-#else
   snprintf(v, sizeof v, "Nuvio %s", NV_VERSAO);
-#endif
   y += rgStat(i18n("Pacote"), v, x, y, w);
   if (carreg[0]) y += rgStat(i18n("Carregador"), carreg, x, y, w);
   if (curl[0]) y += rgStat("libcurl", curl, x, y, w);
@@ -1204,11 +1079,7 @@ static void inspVazio(void) {
   y += rgDevCard(x, y) + 22;
   y += rgStat(i18n("Arquivo de log"), arq ? arq : i18n("nenhum"), x, y, w);
   // Sem arquivo (Mac sem NUVIO_LOG) o envio manda texto vazio: indisponivel.
-#ifdef __EMSCRIPTEN__
-  y += rgStat(i18n("Envio de registro"), env.disponivel ? i18n("disponível") : i18n("indisponível"), x, y, w);
-#else
   y += rgStat(i18n("Envio de registro"), env.disponivel && arq ? i18n("disponível") : i18n("indisponível"), x, y, w);
-#endif
   y += 30;
   rgK2("De onde o painel lê", x, y);
   y += 16 + 10;
@@ -1230,9 +1101,6 @@ static void rgSeguindo(const char *s) {
   TxtLinha t = rgT(TXT_ILHA_APOIO, s);
   float cx = RP_X + RP_W * 0.5f, yc = RL_BASE + 10 + 9;
   float x0 = RP_X + 26, x1 = RP_X + RP_W - 26;
-#ifdef NV_TOUCH_UI
-  ponteiro_alvo(x0, RL_BASE + 4, x1 - x0, 30, NULL, toqueRegSeguir, 0, 0);
-#endif
   gfx_cor((GfxRect){ x0, yc, cx - t.w * 0.5f - 12 - x0, 1 }, 0, 1, 1, 1, 0.07f);
   gfx_cor((GfxRect){ cx + t.w * 0.5f + 12, yc, x1 - (cx + t.w * 0.5f + 12), 1 }, 0, 1, 1, 1, 0.07f);
   txt_desenhar_alpha(t, cx - t.w * 0.5f, yc - t.h * 0.5f, 0.42f);
@@ -1268,13 +1136,8 @@ static void desenhaVazio(void) {
   float th;
   if (!semFonte) { tit = "Nenhuma linha de log ainda."; txt = NULL; }
   else {
-#ifdef __EMSCRIPTEN__
-    tit = "A página não expôs as linhas do log";
-    txt = "O log completo continua no console do navegador.";
-#else
     tit = "Esta versão manda o log para o terminal";
     txt = "Não há um arquivo para ler aqui. Para ver o registro nesta tela, rode com NUVIO_LOG apontando para um arquivo.";
-#endif
   }
   th = txt ? rgBlocoAltura(TXT_DET_META2, txt, 760, 31.5f, 4) : 0;
   y = RL_TOPO + (RP_Y + RP_H - 73 - RL_TOPO - 60) * 0.5f - (96 + 28 + 41 + (txt ? 12 + th : 0) + (semFonte ? 26 + 56 + 44 + 21 : 0)) * 0.5f;
@@ -1305,7 +1168,6 @@ static void desenhaVazio(void) {
       if (lin1[0]) { TxtLinha l = rgT(TXT_DET_META2, lin1); txt_desenhar_alpha(l, cx - l.w * 0.5f, y + k * 31.5f, 0.6f); k++; }
       y += k * 31.5f; }
   }
-#if !defined(__EMSCRIPTEN__)
   if (semFonte) {
     TxtLinha c = txt_linha(TXT_MONO19, "NUVIO_LOG=/tmp/nuvio.log bash tools/mac.sh", RG_TX, 255);
     y += 26;
@@ -1315,7 +1177,6 @@ static void desenhaVazio(void) {
     { TxtLinha l = rgT(TXT_AJ_ESTADO, "Com arquivo e nenhuma linha ainda, a frase é só: “Nenhuma linha de log ainda.”");
       txt_desenhar_alpha(l, cx - l.w * 0.5f, y, 0.42f); }
   }
-#endif
 }
 
 static void desenhaPainel(void) {
@@ -1440,9 +1301,6 @@ static void desenhaPainel(void) {
 // falava da Samsung aqui ate 03/10).
 // Texto "rico" (palavras de dois pesos) quebrado em linhas de `w`.
 typedef struct { const char *s; TxtEstilo e; float a; } RgRun;
-#ifdef NV_TOUCH_UI
-static int rgRicoMedindo;
-#endif
 static float rgRico(const RgRun *r, int n, float x, float y, float w, float lh) {
   float cx = 0, cy = 0, esp = (float)txt_largura(TXT_AJ_ESTADO, "a a") - (float)txt_largura(TXT_AJ_ESTADO, "aa");
   int i;
@@ -1460,9 +1318,6 @@ static float rgRico(const RgRun *r, int n, float x, float y, float w, float lh) 
       ww = (float)txt_largura(r[i].e, wd);
       if (cx > 0 && !cola && cx + esp + ww > w) { cx = 0; cy += lh; }
       else if (cx > 0 && !cola) cx += esp;
-#ifdef NV_TOUCH_UI
-      if (!rgRicoMedindo)
-#endif
       { TxtLinha t = txt_linha(r[i].e, wd, RG_TX, 255); txt_desenhar_alpha(t, x + cx, y + cy, r[i].a); }
       cx += ww;
       s += tk;
@@ -1476,45 +1331,14 @@ static void desenhaAviso(void) {
   float x = 48, y = 36, w = 900, cx = x + 36, cw = w - 72, h;
   char hora[16];
   const char *frase =
-#if defined(NV_ANDROID)
-    "Aperte Info (i) no controle para abrir e fechar o registro.";
-#elif defined(NV_TPK) || defined(__EMSCRIPTEN__)
-    "Aperte o botão vermelho do controle para abrir e fechar o registro. Nos controles Samsung novos o vermelho não é um botão: aperte (ou segure) o botão de números e cores, abaixo do liga-desliga, até a fileira de cores aparecer na tela.";
-#else
     "Aperte o botão vermelho do controle para abrir e fechar o registro. No controle da LG ele fica na fileira de botões coloridos, quando o controle tiver essa fileira.";
-#endif
   const char *titulo =
-#if defined(NV_ANDROID)
-    "O registro do app abre no botão Info";
-#else
     "O registro do app abre no botão vermelho";
-#endif
   int teclas =
-#if defined(NV_ANDROID)
-    0;
-#else
     1;
-#endif
-#ifdef NV_TOUCH_UI
-  float apoioMobileH = 0;
-  if (telefoneui_ativo()) {
-    RgRun r[3] = { { "Sem a fileira de cores? Ajustes › Sobre e ajuda ›", TXT_AJ_ESTADO, 0.6f },
-                   { "Ver o registro na tela", TXT_LOG_18B, 0.9f }, { ".", TXT_AJ_ESTADO, 0.6f } };
-    w = telefoneui_largura(w, NV_TELA_W, 24);
-    x = (NV_TELA_W - w) * 0.5f; cx = x + 36; cw = w - 72;
-    // Measure the same translated, mixed-weight runs before drawing the card.
-    // On a phone the optional colour row sits above the help, never beside it.
-    rgRicoMedindo = 1;
-    apoioMobileH = 40 + rgRico(r, 3, 0, 0, cw - 48, 24.65f) + (teclas ? 70 : 0);
-    rgRicoMedindo = 0;
-  }
-#endif
   float fh = rgBlocoAltura(TXT_AJ_TEXTO, frase, cw, 30, 5);
   { time_t tt = time(NULL); struct tm tmv; localtime_r(&tt, &tmv); snprintf(hora, sizeof hora, "%02d:%02d", tmv.tm_hour, tmv.tm_min); }
   h = 64 + 28 + 41 + 14 + fh + 26 + (teclas ? 107 : 64) + 24 + 30 + 32;
-#ifdef NV_TOUCH_UI
-  if (telefoneui_ativo()) h += apoioMobileH - (teclas ? 107 : 64);
-#endif
   rgIlha((GfxRect){ x, y, w, h }, 36, 0.80f, 0.055f, 0.059f, 0.071f);
   // ig-h: icone, "Dica", fio, hora.
   { float hx = x + 28;
@@ -1531,9 +1355,6 @@ static void desenhaAviso(void) {
   { float ch = teclas ? 107 : 64, kx = cx + 24, ky = y + 20;
     RgRun r[3] = { { "Sem a fileira de cores? Ajustes › Sobre e ajuda ›", TXT_AJ_ESTADO, 0.6f },
                    { "Ver o registro na tela", TXT_LOG_18B, 0.9f }, { ".", TXT_AJ_ESTADO, 0.6f } };
-#ifdef NV_TOUCH_UI
-    if (telefoneui_ativo()) ch = apoioMobileH;
-#endif
     rgNeutro((GfxRect){ cx, y, cw, ch }, 24, 0.05f, RG_CART_SOL, 1);
     if (teclas) {
       static const float C[4][3] = { { 0.847f, 0.267f, 0.235f }, { 0.247f, 0.682f, 0.353f },
@@ -1548,10 +1369,6 @@ static void desenhaAviso(void) {
           { TxtLinha l = rgT(TXT_G14B, "Registro"); txt_desenhar(l, k.x + (86 - l.w) * 0.5f, k.y + 40 + 10); }
         } else gfx_cor(k, 0.5f, C[i][0], C[i][1], C[i][2], 0.38f);
       }
-#ifdef NV_TOUCH_UI
-      if (telefoneui_ativo()) rgRico(r, 3, kx, y + 90, cw - 48, 24.65f);
-      else
-#endif
       rgRico(r, 3, kx + 400 + 22, y + (ch - 2 * 24.65f) * 0.5f, cw - 24 - 400 - 22 - 24, 24.65f);
     } else rgRico(r, 3, kx, y + 20, cw - 48, 24.65f);
     y += ch + 24; }

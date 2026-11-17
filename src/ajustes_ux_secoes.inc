@@ -181,11 +181,11 @@ static int ajCenaSecao(int op) {
       return AJC_HOME_ESTILO;
     case AJ_FIL_ORDEM: case AJ_FIL_LIMITE: case AJ_ITENS_FILEIRA: case AJ_ESPACO_FILEIRAS: case AJ_ESPACO_TITULOS: case AJ_OCULTAR_NLANC: case AJ_NOTAS_HOME:
     case AJ_ROTULOS: case AJ_NOME_ADDON: case AJ_SUFIXO_TIPO: case AJ_SELO_VISTO: case AJ_ABAS_ESTILO:
-    case AJ_OCULTAR_FILMES_VISTOS: case AJ_BIB_HOME: case AJ_AMIGOS_ESTILO:
+    case AJ_OCULTAR_FILMES_VISTOS: case AJ_BIB_HOME:
       return AJC_HOME_FILEIRAS;
     case AJ_TITULO_FIL: case AJ_PALCO_FUNDO:
       return AJC_APA_FILEIRAS;
-    case AJ_MENU_TOPO: case AJ_RAIL_MODERNA: case AJ_RAIL: case AJ_MENU_EXPLORAR: case AJ_MENU_GUIA: case AJ_MENU_AGENDA:
+    case AJ_MENU_TOPO: case AJ_RAIL_MODERNA: case AJ_RAIL: case AJ_MENU_GUIA: case AJ_MENU_AGENDA:
     case AJ_MENU_PERFIL: case AJ_RAIL_BLUR: case AJ_DESCOBRIR: case AJ_MIC_BUSCA:
       return AJC_HOME_BARRA;
     case AJ_PS_FUNDO: case AJ_PS_CONTINUAR: return AJC_HOME_PERFIL;
@@ -212,7 +212,7 @@ static int ajCenaSecao(int op) {
       return AJC_CAR_ORIGEM;
     case AJ_HERO_TRAILER: case AJ_FOCO_TRAILER: case AJ_DET_TRAILER_AUTO: case AJ_DET_TRAILER: return AJC_TRL_ONDE;
     case AJ_HERO_TRAILER_SOM: case AJ_DET_TRAILER_SOM: case AJ_TRAILER_FONTE: case AJ_HERO_TRAILER_ESPERA:
-    case AJ_TRAILER_QUAL: case AJ_TRAILER_ASPECTO: case AJ_TRAILER_ZOOM_TPK: case AJ_LOGO_TRAILER:  case AJ_TRAILER_AUDIO:
+    case AJ_TRAILER_QUAL: case AJ_TRAILER_ASPECTO: case AJ_RESERVADO_ZOOM: case AJ_LOGO_TRAILER:  case AJ_TRAILER_AUDIO:
       return AJC_TRL_SOM;
     case AJ_VIDRO: case AJ_VIDRO_CONTORNO: case AJ_FOCO_ACENTO: case AJ_VIDRO_OPAC: case AJ_VIDRO_FOSCO: case AJ_VIDRO_QUALIDADE: return AJC_APA_VIDRO;
     case AJ_ANIM: case AJ_RELOGIO: case AJ_RELOGIO_12H: return AJC_APA_MOVIMENTO;
@@ -229,7 +229,7 @@ static int ajCenaSecao(int op) {
     case AJ_FONTE_HDR:
     case AJ_AUDIO_OFFSET: case AJ_QUALIDADE: case AJ_DV: case AJ_DV_MKV: case AJ_DV7: case AJ_ATMOS: case AJ_DTS_AC3: case AJ_CACHE_SEEK: case AJ_BUFFER: case AJ_PLAYER_EXTERNO: case AJ_PLAYER_ANIME: return AJC_REP_IMAGEM;
     case AJ_PAUSA_COMENTARIOS: case AJ_PAUSA_NOTAS: case AJ_PAUSA_ELENCO:
-    case AJ_PAUSA_OVERLAY: case AJ_PLR_CLASSIF: case AJ_TELA_ABERTURA: case AJ_ABERTURA_ADDON: case AJ_ABERTURA_FUNDO: case AJ_ABERTURA_ESTILO: case AJ_ESTAT_TAMANHO: case AJ_ESTAT_LADO: case AJ_PULAR_ABERTURA: case AJ_PULAR_RESUMO: case AJ_PULAR_CREDITOS: case AJ_PROXIMO_AUTO: case AJ_PROXIMO_CONTAGEM: case AJ_REACAO_CREDITOS: case AJ_SAIDA_PLAYER: case AJ_MANTER_VIDEO: case AJ_RETOMADA_MORNA: case AJ_MANTER_PRAZO: case AJ_PROPORCAO_PADRAO: return AJC_REP_DURANTE;
+    case AJ_PAUSA_OVERLAY: case AJ_PLR_CLASSIF: case AJ_TELA_ABERTURA: case AJ_ABERTURA_ADDON: case AJ_ABERTURA_FUNDO: case AJ_ABERTURA_ESTILO: case AJ_ESTAT_TAMANHO: case AJ_ESTAT_LADO: case AJ_PULAR_ABERTURA: case AJ_PULAR_RESUMO: case AJ_PULAR_CREDITOS: case AJ_PROXIMO_AUTO: case AJ_PROXIMO_CONTAGEM: case AJ_SAIDA_PLAYER: case AJ_MANTER_VIDEO: case AJ_RETOMADA_MORNA: case AJ_MANTER_PRAZO: case AJ_PROPORCAO_PADRAO: return AJC_REP_DURANTE;
     case AJ_PLR_FORMATO: case AJ_PLR_FORMATO_POS: case AJ_PLR_CODEC: return AJC_REP_DURANTE;
     case AJ_SEEKR_LIGADO: case AJ_SEEKR_CHAVE: case AJ_SEEKR_TESTAR: case AJ_SEEKR_FITA: case AJ_SEEKR_AJUSTE:
       return AJC_REP_SEEKR;
@@ -435,8 +435,8 @@ static void ajcHomeFileiras(int A) {
 }
 // Barra lateral: o menu do app, com os itens que as opcoes ligam e desligam.
 static void ajcHomeBarra(int A) {
-  static const struct { const char *ico, *nome; int op; } IT[7] = {
-    { "aj_house", "Início", -1 }, { "aj_search", "Buscar", AJ_DESCOBRIR }, { "aj_compass", "Explorar", AJ_MENU_EXPLORAR },
+  static const struct { const char *ico, *nome; int op; } IT[6] = {
+    { "aj_house", "Início", -1 }, { "aj_search", "Buscar", AJ_DESCOBRIR },
     { "aj_tv-minimal-play", "Guia TV", AJ_MENU_GUIA }, { "aj_calendar", "Agenda", AJ_MENU_AGENDA },
     { "aj_user-round", "Perfil", AJ_MENU_PERFIL }, { "aj_settings-2", "Ajustes", -1 } };
   int larga = !ajustes_rail_recolhida() || ajustes_rail_moderna(), i;
@@ -447,7 +447,7 @@ static void ajcHomeBarra(int A) {
   CACC(rw + 70, 236, 104, 30, 1);
   if (ajustes_rail_moderna_blur() && ajustes_rail_moderna()) ajcBorrada(ajArte(AJA_FUNDO, A), CR(28, 24, rw, 312), 26 * ajc.s, 1);
   CVID(28, 24, rw, 312, 26);
-  for (i = 0; i < 7; i++) {
+  for (i = 0; i < 6; i++) {
     float iy = 44 + i * 40, al = IT[i].op == AJ_DESCOBRIR || IT[i].op < 0 ? 1.0f : ON(IT[i].op);
     if (i == 0) gfx_cor(CR(36, iy - 6, rw - 16, 32), 0.5f, 1, 1, 1, 0.14f);
     CICON(IT[i].ico, 48, iy, 20, 0.85f * al);
@@ -720,7 +720,7 @@ static void ajcTrlSom(int A) {
   CIMG(ajArte(AJA_FUNDO, A), 0, 0, 640, 360, 22, 1);
   if (tarja) { gfx_cor(CR(0, 0, 640, 40), 0, 0, 0, 0, 0.92f); gfx_cor(CR(0, 320, 640, 40), 0, 0, 0, 0, 0.92f); }
   ajcFoco(AJ_TRAILER_ASPECTO, 8, 8, 624, 344, 18);
-  ajcFoco(AJ_TRAILER_ZOOM_TPK, 8, 8, 624, 344, 18);
+  ajcFoco(AJ_RESERVADO_ZOOM, 8, 8, 624, 344, 18);
   gfx_veu_css(CR(0, 160, 640, 200), 0, 0, 1.0f, 0.75f);
   if (!lig(AJ_LOGO_TRAILER)) ajLogo(ajArte(AJA_LOGO, A), CX(36), CY(204), 200 * ajc.s, 60 * ajc.s, 1);
   ajcFoco(AJ_LOGO_TRAILER, 32, 200, 208, 68, 8);
@@ -848,7 +848,7 @@ static void ajcRepImagem(int A) {
   ajcTxt("Áudio", 13, 1, 56, 140, 0, 0.6f);
   { float mw = marca_formato(FMT_ATMOS, CX(56), CY(168), 30 * ajc.s, 1, 1, 1, lig(AJ_ATMOS) ? 0.95f : 0.25f) / ajc.s;
     ajcFoco(AJ_ATMOS, 52, 164, mw + 8, 38, 8); }
-  for (i = 0; i < 7; i++) gfx_cor(CR(56 + i * 34, 228, 22, 22), 0.5f, 1, 1, 1, i < 5 ? 0.6f : 0.25f);
+  for (i = 0; i < 6; i++) gfx_cor(CR(56 + i * 34, 228, 22, 22), 0.5f, 1, 1, 1, i < 5 ? 0.6f : 0.25f);
   CVID(328, 30, 276, 250, 24);
   for (i = 0; i < 3; i++) {
     int passa = sel == 0 || sel == 1 || (sel == 2 && i <= 1) || (sel == 3 && i == 0);
@@ -881,8 +881,6 @@ static void ajcRepDurante(int A) {
   CIMG(ajArte(AJA_FUNDO, A + 1), 384, 206, 104, 58, 8, 1);
   gfx_anel(CR(500, 214, 40, 40), 0.5f, 3 * ajc.s, ajc.ar, ajc.ag, ajc.ab, 1);
   ajcTxt("Próximo episódio", 11, 1, 384, 276, 200, 0.85f);
-  if (lig(AJ_REACAO_CREDITOS)) { CICON("aj_thumbs-up", 556, 212, 18, 0.9f); CICON("aj_heart", 556, 238, 18, 0.9f); }
-  ajcFoco(AJ_REACAO_CREDITOS, 548, 204, 34, 60, 10);
   gfx_cor(CR(36, 326, 568, 5), 0.5f, 1, 1, 1, 0.22f); CACC(36, 326, 530, 5, 1);
   { float w2 = ajcTxt(textoValor(AJ_SAIDA_PLAYER), 11, 1, 0, 0, 220, 0) + 44;
     CVID(36, 280, w2, 28, 14); CICON("aj_corner-up-left", 46, 285, 16, 0.85f);
@@ -951,9 +949,6 @@ static void ajcIdiFaixas(int A) {
   int OP[5] = { AJ_AUD_LINGUA, AJ_LEG_LINGUA, AJ_LEG_LINGUA2, AJ_LEG_SYNC_AUTO, AJ_LEG_SYNC_AUDIO };
   static const char *const IC[5] = { "aj_audio-lines", "aj_captions", "aj_captions", "aj_activity", "aj_activity" };
   int i, n = 4;
-#ifdef NV_ANDROID
-  n = 5;
-#endif
   if (ajc.op == AJ_LEG_SYNC_AUDIO) n = 5;
   if (ajc.op == AJ_AUD_LINGUA2) OP[0] = AJ_AUD_LINGUA2;   // a linha em foco no lugar da principal
   CIMG(ajArte(AJA_FUNDO, A), 0, 0, 640, 360, 22, 1);
@@ -1222,7 +1217,7 @@ static void ajcConServidores(int A) {
     if (f) gfx_anel_fora(CR(bx, 30, 180, 170), 20.0f / 170, 3 * ajc.s, 2.5f * ajc.s, ajc.ar, ajc.ag, ajc.ab, 1);
   }
   ajcFoco(AJ_JF_LIGADO, 36, 30, 572, 170, 20);
-  for (i = 0; i < 7; i++) CIMG(ajArte(AJA_POSTER, AJ_POS[(A + i) % 14]), 36 + i * 82, 222, 70, 105, 8, 0.85f * al);
+  for (i = 0; i < 6; i++) CIMG(ajArte(AJA_POSTER, AJ_POS[(A + i) % 14]), 36 + i * 82, 222, 70, 105, 8, 0.85f * al);
 }
 
 // --- DESEMPENHO DESTA TV --------------------------------------------------------------
@@ -1283,25 +1278,8 @@ static void ajcDesDiag(int A) {
 }
 
 // --- SOBRE E AJUDA --------------------------------------------------------------------
-// Guia de uso: os capitulos de verdade e uma pagina aberta.
-static void ajcSobGuia(int A) {
-  int i, k;
-  ajCenaArte(ajArte(AJA_FUNDO, A), (GfxRect){ ajc.x, ajc.y, 640 * ajc.s, ajc.h }, 22, 0.62f);
-  CVID(36, 24, 250, 312, 24);
-  for (i = 0; i < 6 && i < GUIA_NCAPS; i++) {
-    float by = 40 + i * 48;
-    if (i == 1) gfx_cor(CR(46, by - 6, 230, 40), 0.5f, 1, 1, 1, 0.12f);
-    CICON(GUIA_CAPS[i].icone, 58, by + 4, 20, 0.85f);
-    ajcTxt(GUIA_CAPS[i].titulo, 12, i == 1, 88, by + 6, 180, i == 1 ? 1.0f : 0.7f);
-  }
-  CVID(302, 24, 302, 312, 24);
-  ajcTxt(GUIA_CAPS[1].titulo, 16, 1, 322, 44, 260, 1);
-  CBAR(322, 80, 250, 0.5f); CBAR(322, 96, 220, 0.5f);
-  for (k = 0; k < 3; k++) ajPreviaHomeArte(CX(322 + k * 90), CY(124), 82 * ajc.s, AJ_POS[(A + k) % 14]);
-  for (k = 0; k < 3; k++) { CBAR(322, 196 + k * 22, 240 - k * 40, 0.4f); }
-  CACC(322, 280, 120, 30, 1);
-  ajcFoco(AJ_GUIA, 28, 16, 584, 328, 26);
-}
+// Guia de uso removido
+static void ajcSobGuia(int A) { (void)A; }
 // O app: o simbolo, a versao, a atualizacao baixando e o que ha de novo.
 static void ajcSobApp(int A) {
   int i;

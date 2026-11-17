@@ -202,7 +202,7 @@ int main(void) {
   snprintf(tela.audio, sizeof tela.audio, "E-AC-3 5.1 · English");
   snprintf(tela.resolucao, sizeof tela.resolucao, "3840 × 2160");
   snprintf(tela.codecHdr, sizeof tela.codecHdr, "Dolby Vision");
-  tela.plataforma = PTV_ANDROID;
+  tela.plataforma = PTV_LG;
   ev_zerar(&est);
   est.velOrigem = est.bufOrigem = est.servOrigem = est.quadrosOrigem = EVO_MEDIDO;
   est.kbps = 53100; est.mediaKbps = 62000; est.picoKbps = 113000;

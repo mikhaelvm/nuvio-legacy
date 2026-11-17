@@ -1,6 +1,3 @@
-#ifdef NV_ANDROID
-#include <unistd.h>   // access (fontes de /system/fonts)
-#endif
 #include "text.h"
 #include "legfontes.h"
 #include "sdlcompat.h"
@@ -145,12 +142,16 @@ static unsigned char tentouLegendaLGCam[TXT_NCAM][TXT_LEG_N];
 #define tentouLegendaLG (tentouLegendaLGCam[camada])
 const char *const TXT_FAMILIAS_PT[TXT_FAMILIA_N] = {
   "Inter", "LG Display", "Droid Sans", "Montserrat", "Roboto",
-  "Atkinson Hyperlegible Next", "JetBrains Sans"
+  "Atkinson Hyperlegible Next", "JetBrains Sans", "Netflix Sans"
 };
 
 static Entrada cache[MAX_LINHAS];
+static unsigned long textoGeracao;
+static void bordasLimpar(void);
 
 static void limparCacheTexto(void) {
+  textoGeracao++;
+  bordasLimpar();
   for (int i = 0; i < MAX_LINHAS; i++) {
     if (cache[i].ocupado && cache[i].linha.tex) {
       gfx_tex_esquecer(cache[i].linha.tex);
@@ -636,7 +637,21 @@ static int carregarFamilia(TxtFamilia familia);
 static void abrirEstiloCamada(TxtFamilia familia, int i);
 static void camadaAtualizar(void);
 // Alvo de composicao do contorno da legenda (ver txt_desenhar_borda).
-static GfxMini bordaMini;
+#define BORDA_CACHE_N 8
+static struct {
+  GfxMini mini;
+  TxtLinha linha;
+  int borda;
+  float escala;
+  unsigned long geracao, uso;
+} bordas[BORDA_CACHE_N];
+static unsigned long bordaUso;
+static void bordasLimpar(void) {
+  for (int i = 0; i < BORDA_CACHE_N; i++) {
+    gfx_mini_liberar(&bordas[i].mini);
+    memset(&bordas[i], 0, sizeof bordas[i]);
+  }
+}
 
 // Quantos caracteres da linha `s` a fonte NAO desenha, e o primeiro deles em
 // *primeiro. Conta so o que faz falta: ASCII nunca, os DECORATIVOS que a fonte
@@ -1027,11 +1042,7 @@ static TTF_Font *fonteLegendaDe(TxtEstilo estilo, const char *s,
     int i = estilo - TXT_LEG_50;
     if (!fontesLegendaLG[i] && !tentouLegendaLG[i]) {
       tentouLegendaLG[i] = 1;
-#ifdef NV_ANDROID
-      fontesLegendaLG[i] = TTF_OpenFont("/system/fonts/Roboto-Regular.ttf",
-#else
       fontesLegendaLG[i] = TTF_OpenFont("/usr/share/fonts/LG_Display-Regular.ttf",
-#endif
           (int)(corpoAtual(estilo) * ESC_T + 0.5f));
       if (!fontesLegendaLG[i] && !avisoFallback[TXT_FAMILIA_LG]) {
         printf("fonte de legenda LG Display indisponivel; usando fallback\n");
@@ -1186,41 +1197,14 @@ static int carregarFamilia(TxtFamilia familia) {
       return 0;
     }
   }
-  for (int i = 0; i < TXT_NFONTES; i++) {
-    int peso = ESTILOS[i].peso;
-    const unsigned char *buf;
-    size_t tam;
-    SDL_RWops *rw;
-    if (peso >= PESO_MONO_R) {
-      int m = peso - PESO_MONO_R;
-      if (!monoTentada[m]) {
-        monoTentada[m] = 1;
-        bytesMono[m] = lerTudo(caminhoMono[m], &tamMono[m]);
-        if (!bytesMono[m]) printf("fonte mono indisponivel: %s\n", caminhoMono[m]);
-      }
-      if (bytesMono[m]) { buf = bytesMono[m]; tam = tamMono[m]; }
-      else { peso = m == 1 ? PESO_BOLD : PESO_REGULAR; buf = bytesPeso[familia][peso]; tam = tamPeso[familia][peso]; }
-    } else { buf = bytesPeso[familia][peso]; tam = tamPeso[familia][peso]; }
-    rw = SDL_RWFromConstMem(buf, (int)tam);
-    fontes[familia][i] = rw
-      ? TTF_OpenFontRW(rw, 0, (int)(corpoAtual(i) * ESC_T + 0.5f))
-      : NULL;
-    rwFonte[familia][i] = rw;
-    if (!fontes[familia][i]) {
-      if (rw) SDL_FreeRW(rw);
-      rwFonte[familia][i] = NULL;
-      printf("TTF_OpenFont %s: %s\n", TXT_FAMILIAS_PT[familia], TTF_GetError());
-      liberarFamilia(familia);
-      familiaTentada[familia] = 1;
-      return 0;
+  for (int m = 0; m < 2; m++) {
+    if (!monoTentada[m]) {
+      monoTentada[m] = 1;
+      bytesMono[m] = lerTudo(caminhoMono[m], &tamMono[m]);
     }
-    // As fontes de sistema legadas não trazem faces de todos os pesos.
-    if ((familia == TXT_FAMILIA_LG || familia == TXT_FAMILIA_DROID) &&
-        peso == PESO_BOLD)
-      TTF_SetFontStyle(fontes[familia][i], TTF_STYLE_BOLD);
   }
   familiaCarregada[familia] = 1;
-  printf("fonte: %s (%d estilos, 3 arquivos)\n", TXT_FAMILIAS_PT[familia], TXT_NFONTES);
+  printf("fonte: %s (estilos sob demanda)\n", TXT_FAMILIAS_PT[familia]);
   return 1;
 }
 
@@ -1339,26 +1323,17 @@ int txt_iniciar(const char *dirRecursos, float escala) {
   snprintf(caminhoPeso[TXT_FAMILIA_JETBRAINS][0], 512, "%sfonts/JetBrainsSans-Regular.ttf", base);
   snprintf(caminhoPeso[TXT_FAMILIA_JETBRAINS][1], 512, "%sfonts/JetBrainsSans-SemiBold.ttf", base);
   snprintf(caminhoPeso[TXT_FAMILIA_JETBRAINS][2], 512, "%sfonts/JetBrainsSans-Bold.ttf", base);
+  snprintf(caminhoPeso[TXT_FAMILIA_NETFLIX][0], 512, "%sfonts/NetflixSans-Regular.otf", base);
+  snprintf(caminhoPeso[TXT_FAMILIA_NETFLIX][1], 512, "%sfonts/NetflixSans-Medium.otf", base);
+  snprintf(caminhoPeso[TXT_FAMILIA_NETFLIX][2], 512, "%sfonts/NetflixSans-Bold.otf", base);
   snprintf(caminhoMono[0], 512, "%sfonts/JetBrainsMonoNL-Regular.ttf", base);
   snprintf(caminhoMono[1], 512, "%sfonts/JetBrainsMonoNL-SemiBold.ttf", base);
   snprintf(caminhoMono[2], 512, "%sfonts/Montserrat-ExtraLight-Relogio.ttf", base);
-#ifdef NV_ANDROID
-  // Android: nao ha LG_Display nem /usr/share/fonts. A "LG" vira Roboto do
-  // sistema e a "Droid" a DroidSans (so nas versoes antigas) ou Roboto.
-  snprintf(caminhoPeso[TXT_FAMILIA_LG][0], 512, "%s", "/system/fonts/Roboto-Light.ttf");
-  snprintf(caminhoPeso[TXT_FAMILIA_LG][1], 512, "%s", "/system/fonts/Roboto-Regular.ttf");
-  snprintf(caminhoPeso[TXT_FAMILIA_LG][2], 512, "%s", "/system/fonts/Roboto-Regular.ttf");
-  for (int p = 0; p < 3; p++)
-    snprintf(caminhoPeso[TXT_FAMILIA_DROID][p], 512, "%s",
-             access("/system/fonts/DroidSans.ttf", R_OK) == 0 ? "/system/fonts/DroidSans.ttf"
-                                                              : "/system/fonts/Roboto-Regular.ttf");
-#else
   snprintf(caminhoPeso[TXT_FAMILIA_LG][0], 512, "%s", "/usr/share/fonts/LG_Display-Light.ttf");
   snprintf(caminhoPeso[TXT_FAMILIA_LG][1], 512, "%s", "/usr/share/fonts/LG_Display-Regular.ttf");
   snprintf(caminhoPeso[TXT_FAMILIA_LG][2], 512, "%s", "/usr/share/fonts/LG_Display-Regular.ttf");
   for (int p = 0; p < 3; p++)
     snprintf(caminhoPeso[TXT_FAMILIA_DROID][p], 512, "%s", "/usr/share/fonts/DroidSans.ttf");
-#endif
 
   // Fallback fonts, in preference order per script. Arabic and Thai prefer
   // bundled UI sans faces; CJK prefers TV system fonts before its subset.
@@ -1462,7 +1437,6 @@ void txt_encerrar(void) {
   for (int k = 0; k < TXT_NCAM; k++) importadasFechar(k);
   importadasRevisao = 0;
   arabeBoldFechar();
-  gfx_mini_liberar(&bordaMini);
   limparCacheTexto();
   // ORDEM: a fonte primeiro, o RWops depois, o buffer por ultimo. A face do
   // FreeType ainda referencia o stream, e o stream, os bytes.
@@ -1820,6 +1794,7 @@ static TxtLinha linhaCache(TxtEstilo estilo, const char *s, int r, int g, int b,
   if (!cv) { cache[slot].ocupado = 0; return vazia; }
 
   GLuint t; glGenTextures(1, &t); glBindTexture(GL_TEXTURE_2D, t);
+  textoGeracao++;
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, cv->w, cv->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, cv->pixels);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -2101,21 +2076,59 @@ void txt_desenhar_peso(TxtLinha l, float x, float y, float alpha, float peso) {
 // tela) e so entao desenhado UMA vez com `alpha`: a cobertura final e a de
 // um unico desenho. Sem FBO (alvo indisponivel) volta ao empilhado de antes.
 void txt_desenhar_borda(TxtLinha b, float x, float y, int borda, float alpha) {
-  static const int dir[8][2] = { {-1,-1}, {0,-1}, {1,-1}, {-1,0}, {1,0}, {-1,1}, {0,1}, {1,1} };
+  static const float dir[8][2] = { {-.7071f,-.7071f}, {0,-1}, {.7071f,-.7071f}, {-1,0}, {1,0}, {-.7071f,.7071f}, {0,1}, {.7071f,.7071f} };
   int i;
-  if (borda == 2) { txt_desenhar_alpha(b, x + 4.f, y + 4.f, .82f * alpha); return; }
   if (!b.tex || alpha <= 0.0f) return;
-  const float m = 4.f;  // margem para a estampa de +-2 e o canto AA
+  int slot = -1, novo = 1;
+  for (i = 0; i < BORDA_CACHE_N; i++) {
+    if (bordas[i].mini.tex && bordas[i].geracao == textoGeracao &&
+        !memcmp(&bordas[i].linha, &b, sizeof b) && bordas[i].borda == borda &&
+        bordas[i].escala == gfx_px_por_unidade()) {
+      slot = i; novo = 0; break;
+    }
+    if (slot < 0 || bordas[i].uso < bordas[slot].uso) slot = i;
+  }
+  GfxMini *bordaMini = &bordas[slot].mini;
+  const float m = 6.f;  // circular outline or feathered directional shadow
   float esc = gfx_px_por_unidade();
   int mw = (int)((b.w + 2.f * m) * esc + 0.5f), mh = (int)((b.h + 2.f * m) * esc + 0.5f);
-  if (esc <= 0.0f || mw < 4 || mh < 4 || !gfx_mini_alvo(&bordaMini, mw, mh)) {
-    for (i = 0; i < 8; i++) txt_desenhar_alpha(b, x + dir[i][0] * 2.f, y + dir[i][1] * 2.f, alpha);
+  // Bound all eight masks together to 4 MiB, independent of subtitle size.
+  size_t bytes = (size_t)mw * mh * 4;
+  size_t total = bytes;
+  for (int q = 0; q < BORDA_CACHE_N; q++)
+    if (q != slot) total += (size_t)bordas[q].mini.w * bordas[q].mini.h * 4;
+  for (int q = 0; total > 4u * 1024 * 1024 && q < BORDA_CACHE_N; q++) {
+    if (q == slot) continue;
+    total -= (size_t)bordas[q].mini.w * bordas[q].mini.h * 4;
+    gfx_mini_liberar(&bordas[q].mini); bordas[q].uso = 0;
+  }
+  if (esc <= 0.0f || mw < 4 || mh < 4 || bytes > 4u * 1024 * 1024 ||
+      gfx_mini_ativo() || !gfx_mini_alvo(bordaMini, mw, mh)) {
+    if (borda == 2 || borda == 3) txt_desenhar_alpha(b, x + 2.5f, y + 2.5f, .82f * alpha);
+    else for (i = 0; i < 8; i++) txt_desenhar_alpha(b, x + dir[i][0] * 2.f, y + dir[i][1] * 2.f, alpha);
     return;
   }
-  gfx_mini_comecar(&bordaMini, x - m, y - m, esc);
-  for (i = 0; i < 8; i++) txt_desenhar_alpha(b, x + dir[i][0] * 2.f, y + dir[i][1] * 2.f, 1.0f);
+  if (novo) {
+  float grupo = gfx_opacidade_grupo;
+  gfx_opacidade_grupo = 1;
+  gfx_mini_comecar(bordaMini, x - m, y - m, esc);
+  if (borda == 2 || borda == 3) {
+    // Composite once before fading: soft coverage never darkens during a fade.
+    for (i = 0; i < 8; i++)
+      txt_desenhar_alpha(b, x + 2.5f + dir[i][0] * 1.25f, y + 2.5f + dir[i][1] * 1.25f, .16f);
+    txt_desenhar_alpha(b, x + 2.5f, y + 2.5f, .46f);
+    if (borda == 3)
+      for (i = 0; i < 8; i++) txt_desenhar_alpha(b, x + dir[i][0] * .85f, y + dir[i][1] * .85f, 1.0f);
+  } else {
+    for (i = 0; i < 8; i++) txt_desenhar_alpha(b, x + dir[i][0] * 2.f, y + dir[i][1] * 2.f, 1.0f);
+  }
   gfx_mini_terminar();
-  gfx_mini_desenhar(&bordaMini, (GfxRect){ x - m, y - m, (float)mw / esc, (float)mh / esc }, 0.0f, alpha);
+  gfx_opacidade_grupo = grupo;
+  bordas[slot].linha = b; bordas[slot].borda = borda;
+  bordas[slot].escala = esc; bordas[slot].geracao = textoGeracao;
+  }
+  bordas[slot].uso = ++bordaUso;
+  gfx_mini_desenhar(bordaMini, (GfxRect){ x - m, y - m, (float)mw / esc, (float)mh / esc }, 0.0f, alpha);
 }
 
 void txt_desenhar_tom(TxtLinha l, float x, float y, float cr, float cg, float cb, float alpha) {

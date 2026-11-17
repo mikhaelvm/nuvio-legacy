@@ -550,7 +550,7 @@ int main(void) {
   { CatItem vazio = item("", "", "tt-logo-empty");
     snprintf(vazio.tipo, sizeof vazio.tipo, "%s", "movie");
     artehero_logo_sessao_iniciar(&vazio);
-    assert(artehero_logo_sessao(&vazio) == NULL);
+    assert(artehero_logo_sessao(&vazio) != NULL); // virtual fallback until localized metadata arrives
     snprintf(vazio.logo, sizeof vazio.logo,
              "%s", "https://image.tmdb.org/t/p/w500/logo-first.png");
     assert(!strcmp(artehero_logo_sessao(&vazio),
@@ -559,7 +559,9 @@ int main(void) {
       snprintf(enriquecida.logo, sizeof enriquecida.logo,
                "%s", "https://image.tmdb.org/t/p/original/logo-second.png");
       assert(!strcmp(artehero_logo_sessao(&enriquecida),
-                     "https://image.tmdb.org/t/p/w1280/logo-first.png")); }
+                     "https://image.tmdb.org/t/p/w1280/logo-second.png"));
+      assert(!strcmp(artehero_logo_sessao_observar(&enriquecida),
+                     "https://image.tmdb.org/t/p/w1280/logo-second.png")); }
     { CatItem outroTipo = vazio;
       snprintf(outroTipo.tipo, sizeof outroTipo.tipo, "%s", "series");
       snprintf(outroTipo.logo, sizeof outroTipo.logo,

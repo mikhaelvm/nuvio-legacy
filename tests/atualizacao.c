@@ -80,10 +80,10 @@ int main(int argc, char **argv) {
     const char *j =
       "{\"assets\":["
       "{\"digest\":\"sha256:aaaa\",\"browser_download_url\":\"https://x/a.wgt\"},"
-      "{\"digest\":\"sha256:bbbb\",\"browser_download_url\":\"https://x/b_arm.ipk\"}]}";
+      "{\"digest\":\"sha256:bbbb\",\"browser_download_url\":\"https://x/com.mikhael.nuvio_1.0.54_arm.ipk\"}]}";
     { int achou = acharIpk(j, url, sizeof url, hash, sizeof hash, AT_SUFIXO);
       CONFERE(achou, "achou o ipk");
-      CONFERE(!strcmp(url, "https://x/b_arm.ipk"), "url do ipk: [%s]", url);
+      CONFERE(!strcmp(url, "https://x/com.mikhael.nuvio_1.0.54_arm.ipk"), "url do ipk: [%s]", url);
       CONFERE(!strcmp(hash, "bbbb"), "digest do MESMO anexo, sem o prefixo: [%s]", hash); }
   }
 
@@ -98,23 +98,23 @@ int main(int argc, char **argv) {
     const char *j =
       "{\"assets\":["
       "{\"digest\":\"sha256:1111\",\"browser_download_url\":\"https://x/NuvioTV-1.1.3-tizen.wgt\"},"
-      "{\"digest\":\"sha256:2222\",\"browser_download_url\":\"https://x/space.nuvio_1.1.3_arm-highcache.ipk\"},"
-      "{\"digest\":\"sha256:3333\",\"browser_download_url\":\"https://x/space.nuvio_1.1.3_arm.ipk\"}]}";
+      "{\"digest\":\"sha256:2222\",\"browser_download_url\":\"https://x/com.mikhael.nuvio_1.1.3_arm-highcache.ipk\"},"
+      "{\"digest\":\"sha256:3333\",\"browser_download_url\":\"https://x/com.mikhael.nuvio_1.1.3_arm.ipk\"}]}";
     CONFERE(acharIpk(j, url, sizeof url, hash, sizeof hash, AT_SUFIXO), "achou o anexo da variante");
     CONFERE(strstr(url, AT_SUFIXO) != NULL, "e o sufixo desta build (%s): [%s]", AT_SUFIXO, url);
     CONFERE(strstr(url, "highcache") == NULL, "build NAO leva a highcache, nem a de cache grande: [%s]", url);
     CONFERE(!strcmp(hash, "3333"), "digest do anexo normal: [%s]", hash);
   }
 
-  // OS NOMES DAS RELEASES 1.3.1/1.3.2 ("NuvioTV-1.3.2-webos.ipk"): a LG normal
+  // OS NOMES DAS RELEASES 1.3.1/1.3.2 ("com.mikhael.nuvio_1.3.2-webos.ipk"): a LG normal
   // ficou duas versoes sem botao porque "-webos.ipk" nao termina em "_arm.ipk".
   // Agora os dois nomes valem, e a normal continua sem pegar a highcache.
   { char url[160], hash[80];
     const char *j =
       "{\"assets\":["
       "{\"digest\":\"sha256:aaaa\",\"browser_download_url\":\"https://x/NuvioTV-1.3.2-tizen.wgt\"},"
-      "{\"digest\":\"sha256:bbbb\",\"browser_download_url\":\"https://x/NuvioTV-1.3.2-webos-highcache.ipk\"},"
-      "{\"digest\":\"sha256:cccc\",\"browser_download_url\":\"https://x/NuvioTV-1.3.2-webos.ipk\"}]}";
+      "{\"digest\":\"sha256:bbbb\",\"browser_download_url\":\"https://x/com.mikhael.nuvio_1.3.2-webos-highcache.ipk\"},"
+      "{\"digest\":\"sha256:cccc\",\"browser_download_url\":\"https://x/com.mikhael.nuvio_1.3.2-webos.ipk\"}]}";
     CONFERE(acharIpk(j, url, sizeof url, hash, sizeof hash, AT_SUFIXO), "nome NuvioTV-*-webos: achou a variante");
     CONFERE(!strcmp(hash, "cccc") && !strstr(url, "highcache"), "normal pelo nome novo, sem highcache: [%s]", url);
   }
@@ -124,10 +124,18 @@ int main(int argc, char **argv) {
   // variante calada e o defeito; mandar para a pagina e a saida honesta.
   { char url[160], hash[80];
     const char *so_highcache =
-      "{\"assets\":[{\"browser_download_url\":\"https://x/space.nuvio_1.1.3_arm-highcache.ipk\"}]}";
+      "{\"assets\":[{\"browser_download_url\":\"https://x/com.mikhael.nuvio_1.1.3_arm-highcache.ipk\"}]}";
     CONFERE(!acharIpk(so_highcache, url, sizeof url, hash, sizeof hash, AT_SUFIXO),
             "so a highcache devolve 0");
     CONFERE(url[0] == 0, "e a url fica vazia"); }
+
+  // An upstream package must never replace the fork, even with a valid suffix.
+  { char url[160], hash[80];
+    const char *upstream = "{\"assets\":[{\"browser_download_url\":\"https://x/space.nuvio.native.legacy_2.0.8_arm.ipk\"}]}";
+    CONFERE(!acharIpk(upstream, url, sizeof url, hash, sizeof hash, AT_SUFIXO),
+            "upstream package rejected");
+    CONFERE(!url[0] && !hash[0], "upstream leaves no install URL or digest");
+  }
 
   // JSON com escapes variados
   { char d[64];

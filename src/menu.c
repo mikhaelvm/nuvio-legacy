@@ -132,7 +132,7 @@ static float menuEscala(void) {
 // "Inicio" sem acento era erro de portugues NA TELA. E "Busca", nao "Buscar":
 // os outros tres sao substantivos (Biblioteca, Ajustes) e o verbo destoava.
 // Rotulos e ordem conferidos na referencia.
-static const char *ROTULOS[MENU_N] = { "Início", "Explorar", "Guia TV", "Busca", "Biblioteca", "Agenda", "Perfil e Stats", "Ajustes" };
+static const char *ROTULOS[MENU_N] = { "Início", "Guia TV", "Busca", "Biblioteca", "Agenda", "Perfil e Stats", "Ajustes" };
 
 // ITEM ESCONDIDO (#162): Explorar, Guia, Agenda e Perfil somem da barra quando
 // desligados nos Ajustes. Inicio, Busca, Biblioteca e Ajustes ficam sempre —
@@ -140,7 +140,6 @@ static const char *ROTULOS[MENU_N] = { "Início", "Explorar", "Guia TV", "Busca"
 // a linha: desenho, alvos do ponteiro e setas pulam o item, e o painel encolhe.
 static int mostra(int i) {
   switch (i) {
-    case MENU_EXPLORAR: return ajustes_menu_explorar();
     case MENU_GUIA:     return ajustes_menu_guia();
     case MENU_AGENDA:   return ajustes_menu_agenda();
     case MENU_PERFIL:   return ajustes_menu_perfil();
@@ -197,9 +196,6 @@ static void icone(int d, float cx, float cy, float s, float r, float g, float b,
 static void corAvatar(const char *hex, float *r, float *g, float *b);
 static int  tvAtivo(void);
 static int  tvOrdem(int *lista);
-#ifdef NV_TOUCH_UI
-static void tvToqueLimpar(void);
-#endif
 static void tvAtualizar(float dt);
 static void tvDesenhar(void);
 static void iconeTraco(int d, float cx, float cy, float s, float r, float g, float b, float a);
@@ -290,9 +286,6 @@ static void focoLinha(GfxRect r, float f, float alpha) {
 static void ponteiroLinha(int i, int b) {
   (void)b;
   if (i < 0 || i >= NV_MENU_FOCOS_TV) return;
-#ifdef NV_TOUCH_UI
-  tvToqueLimpar();
-#endif
   if (!aberto) menu_abrir();
   linha = i;
 }
@@ -422,9 +415,6 @@ static void desenhaBarra(float e, float a, int focos, float entrada) {
 }
 
 int menu_iniciar(void) {
-#ifdef NV_TOUCH_UI
-  tvToqueLimpar();
-#endif
   aberto = 0; destino = MENU_INICIO; linha = MENU_INICIO; mudou = 0;
   desliza = 0.0f; expande = 0.0f; expandeV = 0.0f;
   for (int i = 0; i < MENU_N; i++) animFoco[i] = 0.0f;
@@ -433,9 +423,6 @@ int menu_iniciar(void) {
 
 void menu_abrir(void) {
   if (aberto) return;
-#ifdef NV_TOUCH_UI
-  tvToqueLimpar();
-#endif
   // O destaque comeca sempre no destino em vigor, nunca onde ficou da ultima
   // vez: a barra e um mapa de onde voce esta, e abrir com o destaque em outro
   // item faria o usuario ler que ja mudou de tela.
@@ -512,9 +499,6 @@ void menu_evento(const SDL_Event *e) {
     return;
   }
   if (e->type != SDL_KEYDOWN) return;
-#ifdef NV_TOUCH_UI
-  tvToqueLimpar();
-#endif
   SDL_Keycode k = e->key.keysym.sym;
   // OK em Buscar so arma; a repeticao do firmware (OK segurado manda KEYDOWNs
   // separados) nao rearma.
@@ -629,7 +613,7 @@ static void icone(int d, float cx, float cy, float s, float r, float g, float b,
 // Os icones da barra CLASSICA: os de traco do mockup (tools/icones-menu.sh).
 // A Dinamica continua chamando icone(), com os menu_*.png de sempre.
 static void iconeTraco(int d, float cx, float cy, float s, float r, float g, float b, float a) {
-  static const char *nomes[MENU_N] = {"mt_inicio", "mt_explorar", "mt_guia", "mt_busca", "mt_biblioteca", "mt_agenda", "mt_perfil", "mt_ajustes"};
+  static const char *nomes[MENU_N] = {"mt_inicio", "mt_guia", "mt_busca", "mt_biblioteca", "mt_agenda", "mt_perfil", "mt_ajustes"};
   if (d < 0 || d >= MENU_N) return;
   gfx_icone((GfxRect){cx-s*.5f, cy-s*.5f, s, s}, nomes[d], r, g, b, a);
 }
@@ -747,9 +731,6 @@ void menu_desenhar(Uint32 agora) {
   gfx_escala_sair(ant);
 }
 static void menu_desenharCorpo_(Uint32 agora) {
-#ifdef NV_TOUCH_UI
-  if (layout_modo_mobile() && !aberto && !ponteiro_borda_registrada()) return;
-#endif
   (void)agora;
   if (tvAtivo()) { tvDesenhar(); return; }
   if (topo()) { topoDesenhar(); return; }
@@ -884,39 +865,13 @@ static int assentado(void) {
   return desliza < 0.002f && expande <= 0.004f && fabsf(expandeV) < 0.05f;
 }
 static float tvRolar = 0.0f, tvRolarV = 0.0f;
-#ifdef NV_TOUCH_UI
-static float tvLayout(float *ys, float *yRotulo);
-static int tvToqueLivre;
-static void tvToqueLimpar(void) { tvToqueLivre = 0; }
-static GfxRect tvToqueRegiao;
-static float tvToqueEscala = 1.0f, tvToqueMaximo;
-static int tvToqueRolar(const PonteiroRolagem *e) {
-  if (!layout_modo_mobile()) { tvToqueLimpar(); return 0; }
-  if (e->fase == PONT_ROL_INICIO) {
-    if (!e->eixoY || !aberto || e->x < tvToqueRegiao.x || e->x >= tvToqueRegiao.x + tvToqueRegiao.w || e->y < tvToqueRegiao.y || e->y >= tvToqueRegiao.y + tvToqueRegiao.h) return 0;
-    tvToqueLivre = 1; tvRolarV = 0.0f; buscaOk = buscaLongo = 0; return 1;
-  }
-  if (e->fase == PONT_ROL_MOVER || e->fase == PONT_ROL_INERCIA) {
-    float antes = tvRolar, proxima = tvRolar - e->delta / tvToqueEscala;
-    int expandir = proxima > tvToqueMaximo && linha < MENU_ST0 && tvPastasTotal(NULL);
-    if (expandir) {
-      float ys[NV_MENU_FOCOS_TV];
-      linha = MENU_ST0;  // Swiping past Settings opens Streaming, like Down.
-      tvToqueMaximo = fmaxf(0.0f, tvLayout(ys, NULL) - TV_ALTURA_MAX);
-    }
-    tvRolar = anim_clamp(proxima, 0.0f, tvToqueMaximo);
-    return expandir || fabsf(tvRolar - antes) > 0.001f;
-  }
-  return 1;
-}
-#endif
 static float tvPilAlfa = 1.0f, tvPilAlvo = 1.0f;
 
 static int tvAtivo(void) { return ajustes_home_layout() == HOME_LAYOUT_DINAMICA; }
 
 // Ordem do original: Inicio, Busca, Explorar... (o resto segue a ordem do app).
 static const int TV_ORDEM[MENU_N] = {
-  MENU_INICIO, MENU_BUSCAR, MENU_EXPLORAR, MENU_GUIA, MENU_AGENDA,
+  MENU_INICIO, MENU_BUSCAR, MENU_GUIA, MENU_AGENDA,
   MENU_BIBLIOTECA, MENU_PERFIL, MENU_AJUSTES
 };
 static const char *tvRotulo(int d) { return menu_rotulo(d); }
@@ -1019,9 +974,6 @@ void menu_pilula_mostrar(float alvo) {
 }
 
 static void tvAtualizar(float dt) {
-#ifdef NV_TOUCH_UI
-  if (!layout_modo_mobile()) tvToqueLimpar();
-#endif
   int i;
   float alvo = aberto ? 1.0f : 0.0f;
   desliza = 0.0f; expande = 0.0f; expandeV = 0.0f;
@@ -1053,10 +1005,6 @@ static void tvAtualizar(float dt) {
     if (alvoR < 0.0f) alvoR = 0.0f;
     if (!aberto && tvAbre <= 0.002f) { tvRolar = 0.0f; tvRolarV = 0.0f; }
     else {
-#ifdef NV_TOUCH_UI
-      if (tvToqueLivre) tvRolar = anim_clamp(tvRolar, 0.0f, total - vis);
-      else
-#endif
       tvRolar = anim_mola2(&tvRolarV, tvRolar, alvoR, dt, TV_MOLA_ROLAR);
     } }
   for (i = 0; i < NV_MENU_FOCOS_TV; i++) {
@@ -1188,12 +1136,7 @@ static void tvSombra(float a) {
 
 static void tvPonteiroPilula(int a, int b) {
   (void)a; (void)b;
-#ifdef NV_TOUCH_UI
-  if (layout_modo_mobile()) ponteiro_borda_ativar();
-  else menu_abrir();
-#else
   menu_abrir();
-#endif
 }
 
 // The hint row: chevron in the icon column, up to two lines of secondary text.
@@ -1227,13 +1170,7 @@ static void tvDesenhar(void) {
         ponteiro_alvo(TV_PIL_X, P.y, P.x + P.w - TV_PIL_X, P.h,
                       NULL, tvPonteiroPilula, 0, 0);
       else
-#ifdef NV_TOUCH_UI
-        ponteiro_alvo(0, 0, 28.0f, NV_TELA_H,
-                      layout_modo_mobile() ? NULL : tvPonteiroPilula,
-                      layout_modo_mobile() ? tvPonteiroPilula : NULL, 0, 0);
-#else
         ponteiro_alvo(0, 0, 28.0f, NV_TELA_H, tvPonteiroPilula, NULL, 0, 0);
-#endif
     }
     if (pa <= 0.01f) return;
   }
@@ -1251,14 +1188,6 @@ static void tvDesenhar(void) {
   if (aberto) {
     ponteiro_alvo(0, 0, NV_TELA_W, NV_TELA_H, NULL, ponteiroFora, 0, 0);
     ponteiro_alvo(Q.x, Q.y, Q.w, Q.h, NULL, NULL, 0, 0);
-#ifdef NV_TOUCH_UI
-    { float ys[NV_MENU_FOCOS_TV];
-      tvToqueEscala = gfx_escala();
-      tvToqueRegiao = (GfxRect){Q.x * tvToqueEscala, Q.y * tvToqueEscala, Q.w * tvToqueEscala, Q.h * tvToqueEscala};
-      tvToqueMaximo = fmaxf(0.0f, tvLayout(ys, NULL) - Q.h);
-      ponteiro_rolagem(tvToqueRolar);
-    }
-#endif
   }
 
   // Keep the polished Apple TV shape and focus. THE MATERIAL IS ALWAYS

@@ -46,6 +46,6 @@ One page, shown once.
 - Voice search is not possible in a native app: the Magic Remote and Bixby microphones only type into web text fields.
 
 ## Packages
-- `space.nuvio.native.legacy_1.3.4_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.3.4_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
+- `com.mikhael.nuvio_1.3.4_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.3.4_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM (capped by the TV's RAM).
 - `NuvioTV-1.3.4-tizen.wgt` — Samsung Tizen (WASM).

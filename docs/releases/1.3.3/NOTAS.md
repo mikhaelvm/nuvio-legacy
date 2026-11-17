@@ -30,6 +30,6 @@ The 4K WebP is decoded already reduced to the hero size — inside libwebp on LG
 - `docs/hisense-vidaa.md` (Portuguese): what a Hisense VIDAA port would take.
 
 ## Packages
-- `space.nuvio.native.legacy_1.3.3_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.3.3_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.3.3_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.3.3_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.3.3-tizen.wgt` — Samsung Tizen (WASM).

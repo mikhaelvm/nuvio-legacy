@@ -89,8 +89,8 @@ A release focused on fixes and optimization: Dolby Vision in MKV on LG TVs (off 
 
 | Platform | File |
 | --- | --- |
-| LG webOS 3+ | `space.nuvio.native.legacy_2.0.3_arm.ipk` |
-| LG with more RAM | `space.nuvio.native.legacy_2.0.3_arm-highcache.ipk` |
+| LG webOS 3+ | `com.mikhael.nuvio_2.0.3_arm.ipk` |
+| LG with more RAM | `com.mikhael.nuvio_2.0.3_arm-highcache.ipk` |
 | Samsung Tizen 4 / 5 / 5.5 | `Nuvio-2.0.3-NuvioTpk40.tpk` |
 | Samsung Tizen 6 | `Nuvio-2.0.3-NuvioTpk60.tpk` |
 | Samsung Tizen 6.5 / 7 | `Nuvio-2.0.3-NuvioTpk65.tpk` |

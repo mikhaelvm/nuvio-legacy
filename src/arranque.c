@@ -1,4 +1,5 @@
 #include "arranque.h"
+#include "app_id.h"
 #ifdef NV_WEBOS
 #include "queda.h"
 #include "avisos.h"
@@ -11,10 +12,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#define ARQ_ETAPA   "/tmp/nuvio-arranque.txt"
-#define ARQ_ANTES   "/tmp/nuvio-arranque-anterior.txt"
-#define ARQ_QUEDA   "/tmp/nuvio-queda-arranque.txt"
-#define ARQ_PEND    "/tmp/nuvio-arranque-pendente.txt"  // relato ainda nao enviado
+#define ARQ_ETAPA   "/tmp/" NV_APP_ID "-arranque.txt"
+#define ARQ_ANTES   "/tmp/" NV_APP_ID "-arranque-anterior.txt"
+#define ARQ_QUEDA   "/tmp/" NV_APP_ID "-queda-arranque.txt"
+#define ARQ_PEND    "/tmp/" NV_APP_ID "-arranque-pendente.txt"  // relato ainda nao enviado
 #define ARQ_FIM     "quadro-1"   // passou daqui = nao e falha de arranque
 // Teto do relato anterior que vai junto (o pendente acumula a cada abertura sem rede).
 #define ARRANQUE_ANTIGO_MAX 6144

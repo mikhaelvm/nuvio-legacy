@@ -18,7 +18,3 @@ cc ${flags[@]+"${flags[@]}"} src/artehero.c tests/artehero.c \
   -o ${TMPDIR:-/tmp}/nuvio-artehero-tests -O1 -g \
   -Wall -Wextra -Wno-deprecated-declarations -Wno-macro-redefined
 ${TMPDIR:-/tmp}/nuvio-artehero-tests
-cc ${flags[@]+"${flags[@]}"} -D__EMSCRIPTEN__ src/artehero.c tests/artehero.c \
-  -Isrc -o ${TMPDIR:-/tmp}/nuvio-artehero-tests-tizen -O1 -g \
-  -Wall -Wextra -Wno-deprecated-declarations -Wno-macro-redefined
-${TMPDIR:-/tmp}/nuvio-artehero-tests-tizen

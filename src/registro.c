@@ -22,9 +22,6 @@
 #include <time.h>
 #include <math.h>
 #include <sys/stat.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
 
 #ifndef NV_VERSAO
 #define NV_VERSAO "dev"
@@ -106,34 +103,15 @@ static Uint32 ultLeitura;
 static char cru[REG_JANELA + 1];
 
 const char *registro_arquivo(void) {
-#ifdef __EMSCRIPTEN__
-  // Nao ha arquivo util no navegador: o "sistema de arquivos" e MEMFS, morre a
-  // cada recarga, e o log ja esta no console. NULL faz main.c pular o freopen.
-  return NULL;
-#else
   static char caminho[256];
   static int resolvido;
   if (!resolvido) {
     const char *env = getenv("NUVIO_LOG");
     resolvido = 1;
     if (env && env[0]) snprintf(caminho, sizeof caminho, "%s", env);
-#if defined(__APPLE__) || defined(NV_LINUX_DESKTOP)
-    // No Mac o log vai para o TERMINAL e continua assim. Para exercitar o
-    // painel na previa:  NUVIO_LOG=/tmp/nuvio.log bash tools/mac.sh
-    else caminho[0] = 0;
-#elif defined(NV_ANDROID)
-    else snprintf(caminho, sizeof caminho, "%s/nuvio.log",
-                  getenv("NUVIO_DADOS") ? getenv("NUVIO_DADOS") : ".");
-#else
-#ifdef NV_DTS_DEBUG
     else snprintf(caminho, sizeof caminho, "/tmp/" NV_APP_ID ".log");
-#else
-    else snprintf(caminho, sizeof caminho, "/tmp/nuvio.log");
-#endif
-#endif
   }
   return caminho[0] ? caminho : NULL;
-#endif
 }
 
 // Corta a URL no HOST. Ver a nota de privacidade em registro.h: a chave do
@@ -283,36 +261,13 @@ static void fatiar(char *texto, int parcial) {
   cont[RG_TUDO] = nLidas;
 }
 
-#ifdef __EMSCRIPTEN__
-// As linhas que o shell (tools/tizen-shell.html) guarda em texto puro, a mesma
-// lista que alimenta o painel DOM. -1 = a lista nem existe (shell antigo), 0 =
-// existe e esta vazia: o painel tem frases diferentes para cada um.
-EM_JS(int, nv_registro_js, (char *dst, int tam, int *total), {
-  try {
-    var a = (typeof window !== "undefined") ? window.__nvLinhas : null;
-    if (!a) return -1;
-    HEAP32[total >> 2] = a.length;
-    if (!a.length) return 0;
-    var t = a.slice(-260).join("\n");
-    if (t.length > tam - 8) t = t.slice(-(tam - 8));
-    stringToUTF8(t, dst, tam);
-    return 1;
-  } catch (e) { return 0; }
-});
-#endif
 
 // Tamanho atual da fonte (bytes do arquivo, ou linhas no wasm); -1 sem fonte.
 static long marcaAtual(void) {
-#ifdef __EMSCRIPTEN__
-  int total = 0;
-  if (nv_registro_js(cru, 2, &total) < 0) return -1;
-  return total;
-#else
   struct stat st;
   const char *c = registro_arquivo();
   if (!c || stat(c, &st) != 0) return -1;
   return (long)st.st_size;
-#endif
 }
 
 #ifdef REGISTRO_TESTE
@@ -333,14 +288,6 @@ static void carregar(void) {
     return;
   }
 #endif
-#ifdef __EMSCRIPTEN__
-  { int r, total = 0;
-    cru[0] = 0;
-    r = nv_registro_js(cru, (int)sizeof cru, &total);
-    marcaLida = total;
-    if (r <= 0) { semFonte = (r < 0); return; }
-    fatiar(cru, 0); }
-#else
   { const char *caminho = registro_arquivo();
     FILE *f;
     long tam, comeco;
@@ -358,7 +305,6 @@ static void carregar(void) {
     fclose(f);
     marcaLida = tam;
     fatiar(cru, comeco > 0); }
-#endif
 }
 
 // --- O ESTADO DO PAINEL ------------------------------------------------------
@@ -377,15 +323,7 @@ static int focoEtapa;       // Sistema com rastro de etapas: a etapa em foco
 static int vis[REG_MAX * 2];
 static unsigned char visCtx[REG_MAX * 2];
 static int nVis;
-#ifdef NV_TOUCH_UI
-static ToqueRolagem toqueRegistro, toqueEtapas, toqueAreas;
-static float toqueRegistroOffset, toqueEtapasOffset, toqueAreasOffset;
-static ToqueRolagem *toqueRegAtiva;
-#endif
 static void filtrar(void) {
-#ifdef NV_TOUCH_UI
-  toquerol_limpar(&toqueRegistro); toquerol_limpar(&toqueEtapas);
-#endif
   int i;
   nVis = 0;
   for (i = 0; i < nLin; i++) {
@@ -417,38 +355,9 @@ static void pausar(int focoEm) {
   detalhe = 1;
 }
 static void seguir(void) {
-#ifdef NV_TOUCH_UI
-  toquerol_limpar(&toqueRegistro);
-#endif
   pausado = 0; foco = -1; detalhe = 0; novas = 0;
   recarregar();
 }
-#ifdef NV_TOUCH_UI
-static int toqueRegistroRolar(const PonteiroRolagem *e) {
-  if (e->fase == PONT_ROL_INICIO) {
-    toqueRegAtiva = NULL;
-    if (telefoneui_ativo() && toquerol_evento(&toqueAreas, e)) { toqueRegAtiva = &toqueAreas; return 1; }
-    if (toquerol_evento(&toqueEtapas, e)) toqueRegAtiva = &toqueEtapas;
-    else if (toquerol_evento(&toqueRegistro, e)) toqueRegAtiva = &toqueRegistro;
-    if (toqueRegAtiva) { pausado = 1; marcaPausa = marcaLida; return 1; }
-    return 0;
-  }
-  return toqueRegAtiva ? toquerol_evento(toqueRegAtiva, e) : 0;
-}
-static void toqueRegLinha(int i, int b) {
-  (void)b;
-  if (i < 0 || i >= nVis) return;
-  pausar(i); detalhe = 0; segEd = focoEnviar = 0;
-}
-static void toqueRegArea(int i, int b) {
-  (void)b;
-  if (i < 0 || i >= RG_N) return;
-  area = i; segEd = 1; focoEnviar = 0; seguir();
-}
-static void toqueRegSeguir(int a, int b) { (void)a; (void)b; seguir(); }
-static void toqueRegEnviar(int a, int b) { (void)a; (void)b; segEd = 0; focoEnviar = 1; }
-static void toqueRegEtapa(int a, int b) { (void)b; focoEtapa = a; segEd = focoEnviar = 0; }
-#endif
 
 // Chamado por quadro com o painel aberto: rele ao vivo, ou conta as novas.
 static void passoAoVivo(void) {
@@ -464,9 +373,6 @@ static void passoAoVivo(void) {
   if (m == marcaLida) return;
   if (!pausado) { recarregar(); return; }
   // Pausado: conta as linhas que chegaram depois da pausa, sem mexer na lista.
-#ifdef __EMSCRIPTEN__
-  novas = (int)(m - marcaPausa);
-#else
   { const char *c = registro_arquivo();
     FILE *f = c ? fopen(c, "rb") : NULL;
     if (f) {
@@ -480,16 +386,12 @@ static void passoAoVivo(void) {
       for (k = 0; k < n; k++) if (buf[k] == '\n') q++;
       novas = q;
     } }
-#endif
   if (novas < 0) novas = 0;
 }
 
 int registro_aberto(void) { return aberto; }
 
 static void abrir(void) {
-#ifdef NV_TOUCH_UI
-  toquerol_limpar(&toqueAreas); toqueAreasOffset = 0;
-#endif
   aberto = 1;
   area = RG_TUDO; segEd = 0; pausado = 0; foco = -1; detalhe = 0; focoEnviar = 0;
   novas = 0; focoEtapa = 0;
@@ -525,17 +427,9 @@ void registro_aviso_primeira_vez(void) {
   aviso = 1;
 }
 
-void registro_legal_abrir(void) { legal = 2; }
-int registro_legal_aberto(void) { return legal; }
-void registro_aviso_legal(void) {
-  char *s;
-  if (legalVisto) return;
-  s = dados_ler("aviso-legal.txt");
-  if (s) { free(s); legalVisto = 1; return; }
-  legalVisto = 1;
-  dados_gravar("aviso-legal.txt", "1\n");
-  legal = 1;
-}
+void registro_legal_abrir(void) { legal = 0; }
+int registro_legal_aberto(void) { return 0; }
+void registro_aviso_legal(void) {}
 
 static int ehAlternar(const SDL_Event *e) {
   if (e->key.repeat) return 0;
@@ -562,16 +456,6 @@ int registro_envio_aberto(void);
 int registro_envio_evento(const SDL_Event *e);
 
 int registro_evento(const SDL_Event *e) {
-#ifdef NV_TOUCH_UI
-  if (toquerol_navegacao(e)) {
-    if (toquerol_livre(&toqueRegistro) && nVis > 0) {
-      foco = (int)(toqueRegistroOffset / 32.0f);
-      if (foco >= nVis) foco = nVis - 1;
-      segEd = 0;
-    }
-    toquerol_limpar(&toqueRegistro); toquerol_limpar(&toqueEtapas); toquerol_limpar(&toqueAreas);
-  }
-#endif
   int ehTecla = (e->type == SDL_KEYDOWN || e->type == SDL_KEYUP || e->type == SDL_TEXTINPUT);
 
   if (e->type == SDL_KEYUP &&
@@ -663,24 +547,6 @@ int registro_evento(const SDL_Event *e) {
 #include "registro_ilha.inc"
 #include "registro_envio.inc"
 
-// Leitura legal com as mesmas pecas de texto longo do painel de registro.
-static void legalPonteiro(int a, int b) { (void)a; (void)b; }
-static void desenhaLegal(void) {
-  const char *texto = legal == 1
-    ? "Nuvio Legacy é um player: addons e listas são de terceiros e você é responsável pelo que adiciona.\nAjustes › Sobre e ajuda › Aviso legal."
-    : "Nuvio Legacy é apenas um player. Não hospeda, armazena, indexa, envia nem distribui conteúdo.\nNão vem com fontes: tudo que toca vem de addons, listas, servidores e contas de terceiros que você escolhe.\nVocê é responsável pelo que adiciona e assiste e por ter direito de acesso onde mora.\nO projeto não controla, recomenda nem verifica addons, listas ou serviços e não fornece links para conteúdo sem licença.\nAvisos de direitos autorais devem ir a quem hospeda o conteúdo.\nNão é afiliado ao Stremio, ao Nuvio oficial, a serviços de streaming ou debrid, nem a fabricantes de TV.";
-  float w = fminf(1500, NV_VTELA_W - 96), x = (NV_VTELA_W - w) * 0.5f;
-  float h = rgBlocoAltura(TXT_AJ_TEXTO, texto, w - 88, 30, 24) + 200;
-  float y = (NV_VTELA_H - h) * 0.5f, by, bw;
-  TxtLinha titulo = rgT(TXT_LOG_T34, "Aviso legal");
-  rgIlha((GfxRect){ x, y, w, h }, 36, 1, 0.055f, 0.059f, 0.071f);
-  txt_desenhar(titulo, x + 44, y + 36);
-  rgBloco(TXT_AJ_TEXTO, texto, x + 44, y + 96, w - 88, 30, 0.85f, 24);
-  by = y + h - 84;
-  bw = rgBotao("OK", NULL, x + 44, by, 1, 1);
-  ponteiro_alvo(x + 44, by, bw, 56, legalPonteiro, NULL, 0, 0);
-}
-
 static void registro_desenharCorpo_(void);
 // Camada ampliada (escala.h): o corpo desenha na tela virtual.
 void registro_desenhar(void) {
@@ -689,17 +555,10 @@ void registro_desenhar(void) {
   ESCALA_FIM();
 }
 static void registro_desenharCorpo_(void) {
-#ifdef NV_TOUCH_UI
-  toqueRegistro.offset = toqueEtapas.offset = toqueAreas.offset = NULL;
-#endif
-  if (!aberto && !aviso && !legal) return;
+  if (!aberto && !aviso) return;
   // RECORTE DESLIGADO ANTES DE DESENHAR: se uma tela esquecer o recorte ligado,
   // o unico sintoma seria o painel de DIAGNOSTICO nao aparecer.
   gfx_sem_recorte();
-  // PONTEIRO (#99): o aviso e um cartao que qualquer tecla dispensa — camada
-  // sem alvos, o clique e o OK (registro_evento o fecha) e nao vaza para a
-  // tela de tras. O painel aberto ja e camada em app.c.
-  if (legal) { ponteiro_camada(); desenhaLegal(); return; }
   if (!aberto && aviso) ponteiro_camada();
   if (aberto) { passoAoVivo(); desenhaPainel(); }
   else desenhaAviso();

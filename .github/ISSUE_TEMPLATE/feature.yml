@@ -16,7 +16,3 @@ body:
       multiple: true
       options:
         - LG webOS
-        - Samsung Tizen
-        - Android TV / Google TV
-        - Hisense VIDAA
-        - All

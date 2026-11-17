@@ -13,5 +13,5 @@ flags=()
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
 cc ${flags[@]+"${flags[@]}"} src/psestilos.c tests/psestilos_luz_barra.c \
   -Isrc -o ${TMPDIR:-/tmp}/nuvio-psestilos-luz-barra -O1 -g \
-  -Wall -Wno-deprecated-declarations -Wno-macro-redefined
+  -Wall -Wno-deprecated-declarations -Wno-macro-redefined -lm
 ${TMPDIR:-/tmp}/nuvio-psestilos-luz-barra

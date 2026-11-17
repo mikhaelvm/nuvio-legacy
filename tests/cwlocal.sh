@@ -8,6 +8,6 @@ if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit
 cc "${flags[@]}" src/catalogo.c src/progresso.c src/cwordem.c tests/cwlocal.c \
   src/cotacat.c src/js.c src/metaprov.c src/colecoes.c src/redeurl.c src/catordem.c \
   -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
-  -o "$work/test" -O1 -g -Wall -Wno-deprecated-declarations \
+  -o "$work/test" -O1 -g -ffunction-sections -fdata-sections -Wl,--gc-sections -Wall -Wno-deprecated-declarations \
   -Wno-macro-redefined -Wno-unused-function
 "$work/test"

@@ -63,13 +63,13 @@
       "runtimeCommit": "1eee19b64329768891f6776c47bb87a714eb8b3b"
     },
     {
-      "file": "space.nuvio.native.legacy_1.7.4_arm-highcache.ipk",
+      "file": "com.mikhael.nuvio_1.7.4_arm-highcache.ipk",
       "bytes": 53148000,
       "sha256": "ffca4b931967e3b63419c8f04e35e03faec4bbd4787133e63d787e405e498508",
       "runtimeCommit": "1eee19b64329768891f6776c47bb87a714eb8b3b"
     },
     {
-      "file": "space.nuvio.native.legacy_1.7.4_arm.ipk",
+      "file": "com.mikhael.nuvio_1.7.4_arm.ipk",
       "bytes": 53149118,
       "sha256": "04a3d6c7722eb35bfaed4be85db088a850faf0ae1fc6f32469e3da885e3a5664",
       "runtimeCommit": "1eee19b64329768891f6776c47bb87a714eb8b3b"

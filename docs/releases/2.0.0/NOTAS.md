@@ -47,8 +47,8 @@ The first time you open it, a short guide walks through what changed. It stays i
 
 | Platform | File |
 | --- | --- |
-| LG webOS 3+ | `space.nuvio.native.legacy_2.0.0_arm.ipk` |
-| LG with more RAM | `space.nuvio.native.legacy_2.0.0_arm-highcache.ipk` |
+| LG webOS 3+ | `com.mikhael.nuvio_2.0.0_arm.ipk` |
+| LG with more RAM | `com.mikhael.nuvio_2.0.0_arm-highcache.ipk` |
 | Samsung Tizen 4 / 5 / 5.5 | `Nuvio-2.0.0-NuvioTpk40.tpk` |
 | Samsung Tizen 6 | `Nuvio-2.0.0-NuvioTpk60.tpk` |
 | Samsung Tizen 6.5 / 7 | `Nuvio-2.0.0-NuvioTpk65.tpk` |

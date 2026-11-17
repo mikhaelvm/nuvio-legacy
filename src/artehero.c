@@ -73,11 +73,7 @@ void artehero_qualidade(int nivel) {
 // depois — o unico abort fatal da 1.4.0. No Tizen a ALTA fica em w1280 para
 // fundo e still; o logo (PNG pequeno) continua subindo.
 static int fundoOriginal(void) {
-#ifdef __EMSCRIPTEN__
-  return 0;
-#else
   return qualidadeImg == 2;
-#endif
 }
 
 // So o endpoint conhecido de FUNDO: nao muda poster, logo, still, URL
@@ -354,11 +350,7 @@ static const char *urlDaFonte(const CatItem *item, int fonte, int grande,
       // na Samsung e na Baixa.
       char enc[200];
       int ano = anoDoItem(item);
-#ifdef __EMSCRIPTEN__
-      const char *t = "1280";
-#else
       const char *t = qualidadeImg == 0 ? "1280" : "1920";
-#endif
       if (!temTt || !ano || !item->titulo[0]) return NULL;
       codificar(item->titulo, enc, sizeof enc);
       // v2 separa no disco a arte antiga, que podia vir do tipo oposto.
@@ -796,6 +788,10 @@ const char *artehero_logo_sessao(const CatItem *item) {
   if ((url = artehero_logo_escolhido(item)) != NULL) return url;
   if (!item) return NULL;
   if (logo_sessao_mesma(item)) {
+    if (item->logo[0]) {
+      url = artehero_url_logo(item->logo);
+      if (url && !falhou(url)) logo_sessao_guardar(url);
+    }
     if (logoSessao.url[0] && !falhou(logoSessao.url)) return logoSessao.url;
     logoSessao.url[0] = 0;
     url = logoAutomatico(item);
@@ -816,6 +812,10 @@ const char *artehero_logo_sessao_observar(const CatItem *item) {
     logoSessao.ativo = 1;
     snprintf(logoSessao.imdb, sizeof logoSessao.imdb, "%s", item->imdb);
     snprintf(logoSessao.tipo, sizeof logoSessao.tipo, "%s", item->tipo);
+  }
+  if (item->logo[0]) {
+    const char *atual = artehero_url_logo(item->logo);
+    if (atual && !falhou(atual)) logo_sessao_guardar(atual);
   }
   if (logoSessao.url[0] && !falhou(logoSessao.url)) return logoSessao.url;
   logoSessao.url[0] = 0;

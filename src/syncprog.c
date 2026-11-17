@@ -34,7 +34,7 @@ static int pedidoContaAtual(const SyncProgRemocao *);
 // updated_at ganha de last_watched, como em rowFreshness do web. Numero pode
 // vir em segundos ou em ms (mapProgressRow trata os dois); texto e ISO.
 static long long lerInstanteMs(const char *p, const char *f) {
-  static const char *chaves[] = { "updated_at", "last_watched", "last_watched_at" };
+  static const char *chaves[] = { "updated_at", "last_watched", "last_watched_at", "lastWatched" };
   unsigned i;
   for (i = 0; i < sizeof chaves / sizeof *chaves; i++) {
     char txt[64];
@@ -101,17 +101,24 @@ int syncprog_puxar_sessao(int perfil, uint64_t sessao) {
     const char *f = js_fim(p);
     ProgRegistro *d = &novo[k];
     double pos, dur;
-    char id[40];
-    if (!js_texto(p, f, "content_id", id, sizeof id) || !id[0]) continue;
-    // O web aceita position_ms/duration_ms e position/duration; os primeiros
-    // ganham quando existem, porque os segundos ja vem em milissegundos nesta
-    // RPC e misturar as duas unidades produz progresso de 100% em tudo.
-    if (!lerNumero(p, f, "position_ms", -1.0, &pos) ||
-        !lerNumero(p, f, "duration_ms", -1.0, &dur)) continue;
-    if (pos < 0 && !lerNumero(p, f, "position", 0, &pos)) continue;
-    if (dur < 0 && !lerNumero(p, f, "duration", 0, &dur)) continue;
-    pos /= 1000.0;
-    dur /= 1000.0;
+    char id[40] = "";
+    if (!js_texto(p, f, "content_id", id, sizeof id))
+      js_texto(p, f, "contentId", id, sizeof id);
+    if (!id[0]) continue;
+    // Unsuffixed historical rows may be seconds. Infer the pair from duration,
+    // not position: a newly-started millisecond checkpoint can be very small.
+    const char *pk = js_tem(p, f, "position_ms") ? "position_ms" :
+                     js_tem(p, f, "positionMs") ? "positionMs" : "position";
+    const char *dk = js_tem(p, f, "duration_ms") ? "duration_ms" :
+                     js_tem(p, f, "durationMs") ? "durationMs" : "duration";
+    if (!lerNumero(p, f, pk, -1, &pos) || !lerNumero(p, f, dk, -1, &dur)) continue;
+    if (pos < 0) { pk = "position"; if (!lerNumero(p, f, pk, 0, &pos)) continue; }
+    if (dur < 0) { dk = "duration"; if (!lerNumero(p, f, dk, 0, &dur)) continue; }
+    int legacyMs = !strcmp(pk, "position") && !strcmp(dk, "duration") && dur > 28800.0;
+    if (strcmp(pk, "position") || legacyMs || pos > 28800.0) pos /= 1000.0;
+    if (strcmp(dk, "duration") || legacyMs || dur > 28800.0) dur /= 1000.0;
+    // Repair historical values accidentally inflated by a factor of 1000.
+    if (dur > 86400.0 && dur / 1000.0 <= 86400.0) { pos /= 1000.0; dur /= 1000.0; }
     if (!isfinite(pos) || !isfinite(dur) || dur <= 1.0 ||
         pos >= (double)LLONG_MAX / 1000.0 || dur >= (double)LLONG_MAX / 1000.0) continue;
     memset(d, 0, sizeof *d);
@@ -120,8 +127,18 @@ int syncprog_puxar_sessao(int perfil, uint64_t sessao) {
     // e aproveita temporada/episodio de la se as colunas nao vierem.
     { int tI = 0, eI = 0;
       prog_content_id(d->contentId, sizeof d->contentId, id, &tI, &eI);
-      if (!lerCoordenada(p, f, "season", &d->temporada) ||
-          !lerCoordenada(p, f, "episode", &d->episodio)) continue;
+      const char *sk = js_tem(p, f, "season") ? "season" : "season_number";
+      const char *ek = js_tem(p, f, "episode") ? "episode" : "episode_number";
+      if (!lerCoordenada(p, f, sk, &d->temporada) ||
+          !lerCoordenada(p, f, ek, &d->episodio)) continue;
+      if (d->episodio <= 0) {
+        char video[128] = "";
+        if (!js_texto(p, f, "video_id", video, sizeof video))
+          js_texto(p, f, "videoId", video, sizeof video);
+        if (!strncmp(video, PREFIXO_EPISODIO, sizeof PREFIXO_EPISODIO - 1))
+          sscanf(video + sizeof PREFIXO_EPISODIO - 1, "%d:%d", &tI, &eI);
+        else if (video[0]) { char base[64]; prog_content_id(base, sizeof base, video, &tI, &eI); }
+      }
       if (d->episodio <= 0) { d->temporada = tI; d->episodio = eI; } }
     if (d->episodio <= 0) { d->temporada = 0; d->episodio = 0; }
     if (d->temporada < 0) d->temporada = 0;
@@ -316,17 +333,21 @@ int syncprog_empurrar(void) {
 
 int syncprog_aplicar(int *casaram) {
   int i, aceitos = 0, noCatalogo = 0, perfil = perfis_ativo();
+  unsigned char aceitou[PROG_MAX];
   NvPerfilSessao sessao = nv_perfil_sessao_ler();
   if (casaram) *casaram = 0;
   if (!nv_perfil_sessao_travar(sessao)) return 0;
   pthread_mutex_lock(&caixaTrava);
   if (caixaSessao != sessao) nCaixa = 0;
+  // Never publish a foreign-profile row, even in a mixed/stale response.
+  for (i = 0; i < nCaixa; i++)
+    if (caixa[i].perfil != perfil) caixa[i].durSeg = 0;
+  aceitos = prog_aplicar_remotos(caixa, nCaixa, aceitou);
   for (i = 0; i < nCaixa; i++) {
     // A resposta pertence ao perfil que fez o pedido. A escolha na TV pode
     // mudar enquanto a RPC esta em voo ou antes deste consumo no fio principal.
     if (caixa[i].perfil != perfil) continue;
-    if (!prog_aplicar_remoto(&caixa[i])) continue;
-    aceitos++;
+    if (!aceitou[i]) continue;
     { int idx = cat_indice_por_imdb(caixa[i].contentId);
       if (idx >= 0) {
         cat_aplicar_progresso(idx, caixa[i].posSeg, caixa[i].durSeg,

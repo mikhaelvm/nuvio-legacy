@@ -22,7 +22,6 @@
 // enquanto Biblioteca e Perfil continuam mais abaixo, como no shell legado.
 typedef enum {
   MENU_INICIO,
-  MENU_EXPLORAR,
   MENU_GUIA,
   MENU_BUSCAR,
   MENU_BIBLIOTECA,

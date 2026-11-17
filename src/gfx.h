@@ -186,7 +186,7 @@ typedef enum {
   // destaque vivo e o tema e "Dinâmica gradiente" ou "imersiva" — e assim que
   // o botao, a linha em foco e o anel de ~40 arquivos viram degrade sem que
   // nenhum mude. As paradas vem de nv_grad_viva, e a luz anda devagar com
-  // nv_tempo_viva (o degrade "respira"; parado com animacoes reduzidas).
+  // nv_tempo_viva (fixo em zero: fundo estatico, cores continuam vivas).
   GFX_COR_GRAD = 31,
   GFX_ANEL_GRAD = 32,
   // GFX_AMBIENTE — a cor da arte VAZANDO na interface: quatro luzes grandes e

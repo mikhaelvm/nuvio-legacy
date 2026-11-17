@@ -72,20 +72,12 @@ void abertura_iniciar(const char *dirArte) {
   marcaW = AB_MARCA_W;
   s = NULL;
   logoapp_iniciar(dirArte);
-  if (logoapp_atual() == LOGO_NOVO) {
-    // O logo Novo: sem arte cheia, o fundo liso e a marca (PNG com alfa) nitidos
-    // em qualquer resolucao. Sem o arquivo, cai no Classico.
-    s = IMG_Load(logoapp_caminho(LOGO_NOVO, LOGO_F_MARCA));
-    if (s) marcaW = AB_NOVO_W;
-  }
-  if (!s) {
-  snprintf(cam, sizeof cam, "%s/marcas/abertura.jpg", dirArte ? dirArte : ".");
+  snprintf(cam, sizeof cam, "%s/marcas/nuvio-oficial-splash.png", dirArte ? dirArte : ".");
   s = IMG_Load(cam);
   if (s) arteCheia = 1;
   else {
-    snprintf(cam, sizeof cam, "%s/marcas/nuvio_wordmark.png", dirArte ? dirArte : ".");
+    snprintf(cam, sizeof cam, "%s/marcas/nuvio-oficial-marca.png", dirArte ? dirArte : ".");
     s = IMG_Load(cam);
-  }
   }
   if (!s) { printf("[abertura] sem a marca (%s)\n", cam); return; }
   c = SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_ABGR8888, 0);   // RGBA em bytes

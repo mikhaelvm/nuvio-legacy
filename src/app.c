@@ -45,6 +45,7 @@
 #include "addonstats.h"
 #include "inicio.h"
 #include "perfilsel.h"
+#include "psestilos.h"
 #include "perfisessao.h"
 #include "sync.h"
 #include "traktauth.h"
@@ -82,7 +83,6 @@
 #include "busca.h"
 #include "spotlight.h"
 #include "biblioteca.h"
-#include "explorar.h"
 #include "agendaui.h"
 #include "agenda.h"
 #include "agendaviso.h"
@@ -97,24 +97,6 @@
 #include "pessoas.h"
 #include "salvospainel.h"
 #include "salvosintro.h"
-#include "novidades.h"
-#include "novidades11.h"
-#include "novidades12.h"
-#include "novidades13.h"
-#include "novidades131.h"
-#include "novidades132.h"
-#include "novidades133.h"
-#include "novidades134.h"
-#include "novidades139.h"
-#include "novidades1312.h"
-#include "novidades142.h"
-#include "novidades148.h"
-#include "novidades170.h"
-#include "novidades180.h"
-#include "novidades20.h"
-#include "novidades201.h"
-#include "novidades202.h"
-#include "novidades_cartao.h"
 #include "dicascontrole.h"
 #include "apoio.h"
 #include "telemetria.h"
@@ -156,14 +138,10 @@
 #include "rede.h"
 #include "ts_sonda.h"
 #include <unistd.h>
-#include "ondever.h"
 #include "fontepref.h"
 #include "audiomemoria.h"
 #include "fontesmortas.h"
 #include "video.h"
-#ifdef NV_TPK
-void video_tpk_cdn_arquivo(const char *url, int usenet, int item, int file);
-#endif
 #include "addons.h"
 #include "legauto.h"
 #include "idioma.h"
@@ -858,9 +836,6 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include <stdio.h>
 
 static Tela tela = TELA_HOME;
-#ifdef NV_LINUX_DESKTOP
-static int uiPreview;
-#endif
 static int sair = 0;
 
 // Nome curto da tela em cena, para o log de campo ("[gpu-modos] lento: ...
@@ -870,7 +845,7 @@ static int sair = 0;
 // vidro em Episodios do custo em qualquer outra. So letras minusculas e '-'.
 const char *app_tela_nome(void) {
   static const char *const NOMES[] = {
-    "login", "escolha-perfil", "home", "explorar", "guia", "busca", "biblioteca", "perfil",
+    "login", "escolha-perfil", "home", "guia", "busca", "biblioteca", "perfil",
     "ajustes", "diagnostico", "player", "social", "addons", "agenda", "livetv-diag", "plugins"
   };
   if (stream_folha_aberta()) return "fontes";
@@ -889,66 +864,6 @@ static int saiuPorEsquerda, saiuPorCima;   // a ultima tecla foi ESQUERDA ou CIM
 static int sidebar_permitida(void) {
   return tela != TELA_GUIA && !player_mini_ativo();
 }
-#ifdef NV_TOUCH_UI
-static int sidebarToquePode(void) {
-  return layout_modo_mobile() && sidebar_permitida() && !menu_aberto() && !player_aberto() &&
-         !central_aberta() && !ilha_modal_aberto() && !celb_aberto() &&
-         !ctx_aberto() && !spainel_aberto() && app_central_pode();
-}
-static void sidebarToqueAbrirTela(Tela origem) {
-  if (!sidebarToquePode() || tela != origem || detail_aberto() || vertudo_aberta()) return;
-  saiuPorEsquerda = saiuPorCima = 0;
-  menu_abrir();
-}
-#define SIDEBAR_TOQUE_TELA(nome, origem) static void nome(void) { sidebarToqueAbrirTela(origem); }
-SIDEBAR_TOQUE_TELA(sidebarToqueHome, TELA_HOME)
-SIDEBAR_TOQUE_TELA(sidebarToqueExplorar, TELA_EXPLORAR)
-SIDEBAR_TOQUE_TELA(sidebarToqueBusca, TELA_BUSCA)
-SIDEBAR_TOQUE_TELA(sidebarToqueBiblioteca, TELA_BIBLIOTECA)
-SIDEBAR_TOQUE_TELA(sidebarToquePerfil, TELA_PERFIL)
-SIDEBAR_TOQUE_TELA(sidebarToqueAjustes, TELA_AJUSTES)
-SIDEBAR_TOQUE_TELA(sidebarToqueDiagnostico, TELA_DIAGNOSTICO)
-SIDEBAR_TOQUE_TELA(sidebarToqueSocial, TELA_SOCIAL)
-SIDEBAR_TOQUE_TELA(sidebarToqueAddons, TELA_ADDONS)
-SIDEBAR_TOQUE_TELA(sidebarToqueAgenda, TELA_AGENDA)
-SIDEBAR_TOQUE_TELA(sidebarToqueLiveTVDiag, TELA_LIVETV_DIAG)
-SIDEBAR_TOQUE_TELA(sidebarToquePlugins, TELA_PLUGINS)
-#undef SIDEBAR_TOQUE_TELA
-static void sidebarToqueDetalhe(void) {
-  if (!sidebarToquePode() || !detail_aberto()) return;
-  saiuPorEsquerda = saiuPorCima = 0;
-  menu_abrir_sobre(1);
-}
-static void sidebarToqueLista(void) {
-  if (!sidebarToquePode() || !vertudo_aberta() || detail_aberto()) return;
-  saiuPorEsquerda = saiuPorCima = 0;
-  menu_abrir_sobre(0);
-}
-static void sidebarToqueRegistrar(int contexto) {
-  PonteiroBordaFn fn = NULL;
-  if (!sidebarToquePode()) return;
-  if (contexto == 1 && detail_aberto()) fn = sidebarToqueDetalhe;
-  else if (contexto == 2 && vertudo_aberta() && !detail_aberto()) fn = sidebarToqueLista;
-  else if (contexto == 0 && !detail_aberto() && !vertudo_aberta()) {
-    switch (tela) {
-      case TELA_HOME: fn = sidebarToqueHome; break;
-      case TELA_EXPLORAR: fn = sidebarToqueExplorar; break;
-      case TELA_BUSCA: fn = sidebarToqueBusca; break;
-      case TELA_BIBLIOTECA: fn = sidebarToqueBiblioteca; break;
-      case TELA_PERFIL: fn = sidebarToquePerfil; break;
-      case TELA_AJUSTES: fn = sidebarToqueAjustes; break;
-      case TELA_DIAGNOSTICO: fn = sidebarToqueDiagnostico; break;
-      case TELA_SOCIAL: fn = sidebarToqueSocial; break;
-      case TELA_ADDONS: fn = sidebarToqueAddons; break;
-      case TELA_AGENDA: fn = sidebarToqueAgenda; break;
-      case TELA_LIVETV_DIAG: fn = sidebarToqueLiveTVDiag; break;
-      case TELA_PLUGINS: fn = sidebarToquePlugins; break;
-      default: break;
-    }
-  }
-  if (fn) ponteiro_borda_esquerda(120.0f, fn);
-}
-#endif
 // perfis_ativo() no instante em que a tela de escolha abriu. So serve para uma
 // pergunta: a pessoa TROCOU de perfil, ou confirmou o mesmo? Agora que a tela
 // aparece a cada arranque, confirmar o mesmo perfil e o caso comum — e recarga
@@ -1048,7 +963,6 @@ static void trocarTela(Tela nova) {
   // Cada tela zera o proprio estado ao ser aberta: voltar para a busca com o
   // texto de duas navegacoes atras seria lixo, nao memoria util.
   switch (tela) {
-    case TELA_EXPLORAR:   explorar_iniciar();   break;
     case TELA_GUIA:       guia_abrir();         break;
     case TELA_BUSCA:      busca_iniciar();      break;
     case TELA_BIBLIOTECA: biblioteca_iniciar(); break;
@@ -1137,11 +1051,6 @@ static void fitDuracaoMidia(void) {
 // player's real source may feed StreamFit. Trailer, channel, warning clip,
 // paused-in-mini or idle pipeline: generation 0, every window is stale.
 static void fitPassivaPermitir(void) {
-#ifdef NV_ANDROID
-  int ok = player_aberto() && !player_id_canal()[0] && player_com_video() &&
-           !vazao_url_aviso(video_url_atual());
-  streamfitpassiva_permitir(ok ? video_android_sessao() : 0);
-#endif
 }
 
 static void origemFontes(const CatItem *c) {
@@ -1318,6 +1227,7 @@ static int retentarCanal(void) {
 }
 
 static int tocarFonteGuardada(void) {
+  if (!ajustes_fonte_manual()) return 0; /* automatic always waits for addon order */
   Stream s;
   char alvo[64];
   Uint32 started = SDL_GetTicks();
@@ -1374,12 +1284,6 @@ static void vigiarFonteGuardada(void) {
     g.pronto = video_pronto();
     g.duracao = video_duracao();
     g.carregando = player_carregando();
-#ifdef NV_ANDROID
-    g.quadro = video_quadro_visto();
-#endif
-#ifdef NV_ANDROID
-  g.quadro = video_quadro_visto();
-#endif
     g.conferencia = fontevolta_conferencia();
     g.desdeMs = desde = SDL_GetTicks() - voltaDesde;
     // A saved link has no stream-list index. Keep its recovery watcher
@@ -2146,11 +2050,7 @@ static void processarTorrentJob(void) {
 // inteira atravessa o worker e o cache: abrir nao reinicia vagas nem pares
 // tentados. O buffer nativo e opcional e pertence ao token deste alvo.
 static void preparoLimparCache(int cancelar) {
-#ifdef NV_ANDROID
-  if (cancelar && preparo.token) player_precarregar_cancelar(preparo.token);
-#else
   (void)cancelar;
-#endif
   fontefalha_sessao_liberar(preparo.falha);
   memset(&preparo, 0, sizeof preparo);
 }
@@ -2165,22 +2065,9 @@ static void preparoInvalidar(void) {
   memset(&preparoUltimo, 0, sizeof preparoUltimo);
 }
 static int preparoBufferPronto(void) {
-#ifdef NV_ANDROID
-  return preparo.token && player_precarregar_estado(preparo.token) == 2;
-#else
   return 0;
-#endif
 }
 static void preparoObservarBuffer(void) {
-#ifdef NV_ANDROID
-  if (preparo.tem && preparo.token && player_precarregar_estado(preparo.token) < 0) {
-    player_precarregar_cancelar(preparo.token); preparo.token = 0;
-    if (preparo.lista != stream_lista_geracao() || !preparoContextoAtual(&preparo.contexto)) return;
-    preparo.falhou = 1;
-    if (preparo.falha) fontefalha_marcar_aberta(preparo.falha);
-    else stream_automatico_excluir(preparo.idx);
-  }
-#endif
 }
 static int preparoVale(const char *alvo, int lembrada) {
   preparoObservarBuffer();
@@ -2201,28 +2088,6 @@ static int preparoVale(const char *alvo, int lembrada) {
 // A sonda pode terminar com um trailer no video. Guarda a mesma fonte e
 // tenta SO o buffer quando esse video sair, sem refazer escolha ou orcamento.
 static void preparoBufferTentar(void) {
-#ifdef NV_ANDROID
-  char alvo[64];
-  if (!preparo.tem || preparo.idx < 0 || preparo.token || preparo.bufferTentou ||
-      !ajustes_fonte_precarregar() || ajustes_fonte_manual() || player_aberto() ||
-      player_mini_ativo() || player_retido() || video_ativo() || !detail_aberto() ||
-      detail_indice() != preparo.catalogo) return;
-  idDoAlvo(cat_item(detail_indice()), alvo, sizeof alvo);
-  if (!preparoVale(alvo, preparo.lembrada) ||
-      !nv_perfil_sessao_travar(preparo.contexto.sessaoPerfil)) return;
-  preparo.bufferTentou = 1;
-  unsigned token = player_precarregar_novo_token();
-  int criado = player_precarregar_fonte(preparo.catalogo, preparo.temporada,
-                                       preparo.episodio, preparo.idx, token);
-  nv_perfil_sessao_destravar();
-  // A criacao so enfileira legenda/JNI, sem HTTP ou espera de worker. Se o
-  // ator mudar ao sair, cancelar o token depois de liberar a trava do perfil.
-  if (!nv_perfil_sessao_atual(preparo.contexto.sessaoPerfil)) {
-    if (criado) player_precarregar_cancelar(token);
-    return;
-  }
-  if (criado) preparo.token = token;
-#endif
 }
 static int preparoEmCurso(const char *alvo, int lembrada) {
   FonteJob *j = &fonteJob;
@@ -2283,7 +2148,7 @@ static void preparoGuardar(FonteJob *j) {
 // abertura. A espera de MKV em curso conserva o seu prazo original; a ponte
 // nativa so transfere os bytes se eles estiverem prontos.
 static int preparoUsar(const char *alvoPlay, int lembrada, int *idx) {
-  if (!preparo.tem) return 0;
+  if (!preparo.tem || addons_estado() == ADD_BUSCANDO) return 0;
   int vale = preparoVale(alvoPlay, lembrada);
   if (preparo.falhou && preparoRodando) return 0;
   int continuar = preparo.falhou && preparo.falha && preparoAtivo() && !ajustes_fonte_manual() &&
@@ -2298,12 +2163,6 @@ static int preparoUsar(const char *alvoPlay, int lembrada, int *idx) {
     fonteFalhaLista = preparo.lista; fonteFalhaManual = -1;
     fonteFalhaPos = -1.0; fonteFalhaEsperando = fonteFalhaN = 0;
   }
-#ifdef NV_ANDROID
-  if (preparo.token) {
-    if (player_precarregar_estado(preparo.token) > 0) player_precarregar_adotar(preparo.token);
-    else player_precarregar_cancelar(preparo.token);
-  }
-#endif
   preparo.token = 0;
   preparoLimparCache(0);
   atomic_fetch_add_explicit(&preparoGeracao, 1, memory_order_acq_rel);
@@ -2327,18 +2186,7 @@ static void prepararAoAbrir(void) {
   if (!stream_lista_do_alvo(alvo)) return;
   g = stream_lista_geracao();
   idBaseDoTitulo(base, sizeof base);
-  // Runs every frame on the detail page: pick (and log) once per list, title
-  // and preference change, not 60 times a second.
-  // The 1 s refresh follows verification marking a source dead in place.
-  { static char ultBase[24]; static unsigned ultG, ultRev; static Uint32 ultT;
-    static int ultN = -1, ultLembrada = -1;
-    if (ultN != stream_n() || ultG != g || ultRev != fontepref_revisao() || strcmp(ultBase, base) ||
-        SDL_GetTicks() - ultT > 1000) {
-      ultLembrada = base[0] ? fontepref_escolher(base) : -1;
-      ultN = stream_n(); ultG = g; ultRev = fontepref_revisao(); ultT = SDL_GetTicks();
-      snprintf(ultBase, sizeof ultBase, "%s", base);
-    }
-    lembrada = ultLembrada; }
+  lembrada = -1; /* installed addon sequence, never remembered ranking */
   preparoContexto(&contexto);
   if (preparoVale(alvo, lembrada)) { preparoBufferTentar(); return; }
   if (!preparo.falhou && preparoUltimo.tem && preparoUltimo.lista == g && !strcmp(preparoUltimo.alvo, alvo) &&
@@ -2424,12 +2272,6 @@ static void abrirProximoEpisodio(int t, int e, int apontar) {
     player_episodio_pedido_liberar();
     return;
   }
-#ifdef NV_ANDROID
-  unsigned tokenAdotado = pronta ? preparada.token : 0;
-  if (pronta && preparada.token) {
-    player_precarregar_adotar(preparada.token); preparada.token = 0;
-  }
-#endif
   nv_perfil_sessao_destravar();
   // Consumir/adotar vem antes do encerramento: posplay_fechar e video_parar
   // so podem cancelar os trabalhos que ainda pertencem ao episodio antigo.
@@ -2437,9 +2279,6 @@ static void abrirProximoEpisodio(int t, int e, int apontar) {
   player_encerrar();
   limparFonteVOD();
   if (!nv_perfil_sessao_atual(sessaoPerfil)) {
-#ifdef NV_ANDROID
-    if (tokenAdotado) player_precarregar_cancelar(tokenAdotado);
-#endif
     proximopreparo_liberar_resultado(&preparada); proximopreparo_cancelar();
     return;
   }
@@ -2448,9 +2287,6 @@ static void abrirProximoEpisodio(int t, int e, int apontar) {
   // Abrir/fechar nao seguram a trava de identidade. Conferir outra vez antes
   // de publicar a lista e seu orcamento como uma unica transferencia curta.
   if (!nv_perfil_sessao_travar(sessaoPerfil)) {
-#ifdef NV_ANDROID
-    if (tokenAdotado) player_precarregar_cancelar(tokenAdotado);
-#endif
     proximopreparo_liberar_resultado(&preparada); proximopreparo_cancelar();
     player_encerrar();
     return;
@@ -2474,9 +2310,6 @@ static void abrirProximoEpisodio(int t, int e, int apontar) {
       stream_definir_lista(NULL, 0);
       aguardandoFonte = 0; fonteEscolhida = -1;
       nv_perfil_sessao_destravar();
-#ifdef NV_ANDROID
-      if (tokenAdotado) player_precarregar_cancelar(tokenAdotado);
-#endif
       proximopreparo_liberar_resultado(&preparada);
       player_erro_fonte();
       return;
@@ -2525,16 +2358,13 @@ static void proximoPreparoPasso(void) {
 // Na pagina do titulo: a API do debrid; quando a lista de fontes chega ou cresce:
 // o host de cada uma das primeiras. Nunca resolve link nem cria arquivo.
 static void aquecerAoAbrirTitulo(void) {
-#ifndef __EMSCRIPTEN__
   const char *api[4];
   int n;
   if (!ajustes_fonte_aquecer()) return;
   n = debrid_origens(api, 4);
   if (n > 0) aquecer_pedir(api, n);
-#endif
 }
 static void aquecerQuandoChegarem(void) {
-#ifndef __EMSCRIPTEN__
   static int visto = -1;
   int sn;
   if (!detail_aberto() || player_aberto() || aguardandoFonte || !ajustes_fonte_aquecer()) { visto = -1; return; }
@@ -2548,7 +2378,6 @@ static void aquecerQuandoChegarem(void) {
     for (k = 0; k < q; k++) p[k] = u[k];
     if (q > 0) aquecer_pedir(p, q);
   }
-#endif
 }
 // TOCAR ENQUANTO CONFERE. O fio que confere publica a primeira candidata da
 // fila (streams.c); aqui ela entra no player na hora, SEM esperar o veredito.
@@ -2598,9 +2427,6 @@ static void vigiarAntecipada(void) {
     case FA_ACAO_DESFAZER_VEREDITO: desfazerAntecipada("a conferencia reprovou"); break;
     case FA_ACAO_DESFAZER_PLAYER:
       printf("[fonte] erro do player antes do veredito: %s\n", video_erro_texto());
-#ifdef NV_ANDROID
-      stream_automatico_erro_decoder(antAberta, video_erro_decoder_codigo(), 0);
-#endif
       fa_player_falhou(antAberta);
       marcarFonteMorta(antAberta);
       stream_automatico_excluir_irmas(antAberta);
@@ -2671,7 +2497,6 @@ static void *sondarRecusaFio(void *u) {
   return NULL;
 }
 static void sondarAposRecusa(void) {
-#ifndef __EMSCRIPTEN__
   static char ultima[NV_MEDIA_URL_MAX];
   const char *url = video_url_atual();
   const Stream *s;
@@ -2687,7 +2512,6 @@ static void sondarAposRecusa(void) {
   if (s) snprintf(p->cab, sizeof p->cab, "%s", s->cabecalhos);
   if (pthread_create(&t, NULL, sondarRecusaFio, p) == 0) pthread_detach(t);
   else free(p);
-#endif
 }
 // ---------------------------------------------------------------- partes
 // UM ARQUIVO DE DENTRO DA FONTE, E O FILME EM PARTES (partes.h).
@@ -2746,10 +2570,6 @@ static void parteTocar(const char *url, double pos) {
   video_definir_cabecalhos("");
   video_definir_mp4(parteMp4);
   definirFonteVOD(url);
-#ifdef NV_TPK
-  video_tpk_cdn_arquivo(url, parteArqLista.usenet, parteArqLista.item,
-                        parteArqK >= 0 && parteArqK < parteArqLista.n ? parteArqLista.arq[parteArqK].id : -1);
-#endif
   parteFase = PF_ABRINDO; parteDesde = SDL_GetTicks(); parteGuardouEm = 0;
   parteProx = -1; parteProxFase = 0; parteProxUrl[0] = 0;
   // O arquivo que toca: a saida do player guarda o ponto dele (partes.h).
@@ -2823,6 +2643,7 @@ static void abrirParte(int fonte, const PartesLista *l, int k) {
 }
 // RETOMAR NA PARTE GUARDADA. 1 = assumiu a abertura (o link vem num fio).
 static int tocarParteGuardada(void) {
+  if (!ajustes_fonte_manual()) return 0;
   PartesPonto p;
   char alvo[64];
   if (ajustes_fonte_manual() || !partes_disponivel() || player_id_canal()[0] || !player_aberto()) return 0;
@@ -3088,9 +2909,6 @@ static void vigiarAberturaManual(void) {
   g.falhou = video_falhou() || player_fonte_falhou();
   g.pronto = video_pronto() && video_pos() > 0.25;
   g.carregando = player_carregando();
-#ifdef NV_ANDROID
-  g.quadro = video_quadro_visto();
-#endif
   g.desdeMs = desde;
   // Erro do player no preparo (Media3 2004 etc., video_android.c): sem isto a
   // tela ficava em "Abrindo fonte" ate o prazo, ou para sempre.
@@ -3134,13 +2952,6 @@ static int aberturaVencida(Uint32 desde) {
   g.dadoChegando = video_pronto() || video_buffer_fim() > 0.5;
   { const Stream *s = stream_item(at);
     g.pesado = s && (s->badges & (badges_bit("r-4k") | badges_bit("v-dv"))); }
-#ifdef NV_ANDROID
-  g.quadro = video_quadro_visto();
-#endif
-#if defined(NV_ANDROID) || defined(NV_TPK)
-  // Trilhas do player ja provam resposta antes do primeiro quadro (DV na TCL).
-  g.dadoChegando |= video_n_audio() > 0 || video_n_legenda() > 0;
-#endif
   if (!inicio_abre_vencida(&g)) return 0;
   printf("[fonte] sem sinal de abertura em %u ms (prazo %u ms%s)\n", (unsigned)desde,
          inicio_abre_prazo_ms(&g), semPerda ? ", proxima nao e pior" : "");
@@ -3319,10 +3130,6 @@ static void renovarVodInterrompido(void) {
   if (fonteDepoisDe < 0 || !alvo[0] ||
       partes_sessao_lista() || parteFase != PF_NADA) return;
   vodRenovou = 1; vodRenovarPos = fonteFalhaPos;
-#ifdef NV_ANDROID
-  // Android retains the exact failure point through failed reopens.
-  if (video_pos() > 0.0) vodRenovarPos = video_pos();
-#endif
   unsigned geracao = novaGeracaoFonte();
   vodRenovandoDesde = SDL_GetTicks() | 1u;
   aguardandoFonte = 2; fontePedidoGeracao = geracao; fonteEscolhida = -2;
@@ -3353,6 +3160,7 @@ static void recarregarFonteVOD(void) {
 static void aliviarMemoria(void) {
   tex_aliviar();
   txt_aliviar();
+  psestilos_aliviar();
   assrender_aliviar();
   memlog_devolver();
 }
@@ -3410,26 +3218,8 @@ static void tentarProximaFonteVOD(void) {
   // film to another source and lost the position.
   else if (aberturaVencida(desde)) motivo = 2;
   else if (!fonteFalha && video_bufferando_ms() > VOD_FONTE_BUFFER_MS) {
-#ifdef NV_ANDROID
-    // Segura a troca so enquanto o fim do buffer ANDA (bufavanco.h), por fonte.
-    // Para VOD no Android, a borda vem de VideoStats.bufferSeg.
-    { static BufAvanco av; VideoStats vs;
-      video_estatisticas(&vs);
-      if (bufavanco_segura(&av, fonteVODDesde, video_bufferando_ms(), SDL_GetTicks(),
-                           bufavanco_borda(video_pos(), vs.bufferSeg))) return;
-    }
-#endif
     motivo = 3;
   }
-#ifdef NV_ANDROID
-  // Playback StreamFit: this source cannot keep up while playing (slow
-  // download vs declared bitrate, or rebuffers). Same path as the stall, but
-  // only with a next candidate: a slow film keeps playing, never an error.
-  else if (video_rede_lenta() &&
-           (fonteFalha ? stream_falha_tem_proxima(fonteFalha, fonteFalhaLista)
-                       : fonteVODTentativas < VOD_FONTE_MAX_TENTATIVAS &&
-                         stream_proxima_vod(stream_atual()) >= 0)) motivo = 4;
-#endif
   if (!motivo) return;
   // #415 (LG G4, webOS 9): erro 600 com 4K tocando, 92 MB livres, e o app
   // reabria a fonte no mesmo instante — o webOS o fechou por memoria. Antes de
@@ -3444,10 +3234,6 @@ static void tentarProximaFonteVOD(void) {
 
   atual = stream_atual();
   if (fonteFalha) {
-#ifdef NV_ANDROID
-    if (atual >= 0 && motivo == 1)
-      stream_automatico_erro_decoder(atual, video_erro_decoder_codigo(), 0);
-#endif
     // O backend pode zerar a posicao ao desistir de reconectar. A amostra do
     // ultimo quadro valido fica na sessao, antes de parar o pipeline.
     guardarPosicaoFonteFalha();
@@ -3463,9 +3249,6 @@ static void tentarProximaFonteVOD(void) {
   // A post-open player failure is not a dead URL. Retry this candidate once
   // without consuming another selection slot, then keep sibling links eligible.
   int abriu = video_fonte_tocou() || fonteVODRetentou;
-#ifdef NV_ANDROID
-  abriu |= video_quadro_visto();
-#endif
   if (atual >= 0 && motivo == 1 && abriu && !fonteVODRetentou) {
     const Stream *s = stream_item(atual);
     if (s && s->url[0]) {
@@ -3485,9 +3268,6 @@ static void tentarProximaFonteVOD(void) {
     else marcarFonteMorta(atual);
   }
   if (atual >= 0 && motivo == 1 && !abriu) {
-#ifdef NV_ANDROID
-    stream_automatico_erro_decoder(atual, video_erro_decoder_codigo(), 0);
-#endif
     int k = stream_automatico_excluir_irmas(atual);
     if (k) printf("[fonte] automatico VOD pulou %d link(s) irmao(s) de %d\n", k, atual);
   }
@@ -3725,10 +3505,6 @@ int app_iniciar(const char *dirArte) {
   perfis_ao_abrir_sessao(perfilEncerrarSessao);
   cat_cache_perfis(1);
   snprintf(perfilDirArte, sizeof perfilDirArte, "%s", dirArte ? dirArte : "");
-#ifdef NV_LINUX_DESKTOP
-  const char *preview = getenv("NUVIO_UI_PREVIEW");
-  uiPreview = preview && !strcmp(preview, "1");
-#endif
   arranque_etapa("app_iniciar/ajustes_recursos");
   ajustes_recursos(dirArte);
   arranque_etapa("app_iniciar/login_recursos");
@@ -3739,15 +3515,6 @@ int app_iniciar(const char *dirArte) {
   stream_fit_fonte_metadados(fitRuntimeMeta);
   arranque_etapa("app_iniciar/home_iniciar");
   homePronta = home_iniciar(dirArte);
-  arranque_etapa("app_iniciar/novidades148_dir");
-  novidades148_dir(dirArte);
-  novidades170_dir(dirArte);
-  novidades180_dir(dirArte);
-  arranque_etapa("app_iniciar/novidades20_dir");
-  novidades20_dir(dirArte);
-  novidades201_dir(dirArte);
-  novidades202_dir(dirArte);
-  novcartao_dir(dirArte);
   arranque_etapa("app_iniciar/apoio_dir");
   apoio_dir(dirArte);
   if (!homePronta)
@@ -3784,8 +3551,6 @@ int app_iniciar(const char *dirArte) {
   // A FONTE LEMBRADA, do mesmo jeito e pelo mesmo motivo: ela e lida antes do
   // primeiro Reproduzir, que pode acontecer segundos depois do arranque quando
   // a pessoa abre direto no "Continuar assistindo".
-  arranque_etapa("app_iniciar/ondever_iniciar");
-  ondever_iniciar();
   arranque_etapa("app_iniciar/fontepref_iniciar");
   fontepref_iniciar();
   // "Reusar o ultimo link" ligado guarda os links no disco (fontevolta.h).
@@ -3812,12 +3577,6 @@ int app_iniciar(const char *dirArte) {
   recomenda_ao_mudar_alcance(atividade_definir_permitido);
   // Sem conta, o app abre no login. Com sessao gravada ele nem passa por ela —
   // pedir o codigo de novo a cada arranque seria o mesmo que nao ter gravado.
-#ifdef NV_LINUX_DESKTOP
-  if (uiPreview) {
-    tela = TELA_HOME;
-    printf("[linux] UI preview: no account sync or video playback\n");
-  } else
-#endif
   if (sessao_logada()) {
     tela = TELA_HOME;
     // Com sessao gravada o ciclo comeca no arranque: e ele que traz os addons
@@ -4012,8 +3771,7 @@ int app_no_login(void) { return tela == TELA_LOGIN; }
 
 int app_na_home(void) {
   return tela == TELA_HOME && homePronta && !player_aberto() && !detail_aberto() &&
-         !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() &&
-         !novcartao_aberto() && !dicascontrole_ocupado();
+         !dicascontrole_ocupado();
 }
 
 // ONDE A AZUL/CH+ ABRE O PAINEL DE SALVOS/AVISOS (dono, 04/10: "tem que dar
@@ -4032,12 +3790,10 @@ static int azulPodeAbrirSalvos(const SDL_Event *e) {
   // So no teclado de verdade (Mac/desktop). No Android a AZUL, o CH+ e o
   // MENU/BOOKMARK CHEGAM como "s" (NuvioActivity/main.c) e o SDL pode deixar o
   // text input ligado: a regra recusava o atalho e o CH+ parou de abrir a ilha.
-#ifndef NV_ANDROID
   if (e->key.keysym.sym == SDLK_s && e->key.keysym.scancode != NV_SCANCODE_BLUE &&
       SDL_IsTextInputActive()) return 0;
-#endif
   switch (tela) {
-    case TELA_HOME: case TELA_EXPLORAR: case TELA_BUSCA: case TELA_BIBLIOTECA:
+    case TELA_HOME: case TELA_BUSCA: case TELA_BIBLIOTECA:
     case TELA_PERFIL: case TELA_SOCIAL: case TELA_ADDONS: case TELA_PLUGINS:
     case TELA_AGENDA: return 1;
     default: return 0;
@@ -4072,15 +3828,7 @@ static void abrirSocialNoTitulo(const char *imdb) {
 
 // O circular "Explorar" da pagina do titulo: a pagina fecha e a toca do coelho
 // comeca nele. Voltar no primeiro degrau da toca pede a pagina de volta
-// (explorar_pediu_abrir), com a grade de climas por baixo.
-static void abrirExplorarNoTitulo(void) {
-  MapaObra o;
-  if (!mapa_obra_do_catalogo(detail_indice(), &o)) return;
-  detail_fechar_seco();
-  trocarTela(TELA_EXPLORAR);
-  menu_definir_destino(MENU_EXPLORAR);
-  explorar_abrir_titulo(&o);
-}
+// Retired destination.
 
 // Foco por controle na ilha: cada pagina pede somente ao ultrapassar seu
 // proprio topo. A geometria do ultimo desenho nao decide quem possui a tecla.
@@ -4095,11 +3843,7 @@ static struct {
 } relogioFoco;
 
 static int relogioFocoMobile(void) {
-#ifdef NV_TOUCH_UI
-  return layout_modo_mobile();
-#else
   return 0;
-#endif
 }
 static int relogioFocoPermitido(void) {
   if (!ajustes_relogio_ligado() || !relogioCabe() ||
@@ -4215,7 +3959,6 @@ static int relogioFocoEvento(const SDL_Event *e) {
 }
 static int relogioPedidoPagina(void) {
   switch (tela) {
-    case TELA_EXPLORAR: return explorar_pediu_relogio();
     case TELA_BUSCA: return busca_pediu_relogio();
     case TELA_BIBLIOTECA: return biblioteca_pediu_relogio();
     case TELA_AGENDA: return agendaui_pediu_relogio();
@@ -4229,7 +3972,9 @@ static int relogioPedidoPagina(void) {
   }
 }
 
+static Uint32 ultimaInteracaoSync;
 void app_evento(const SDL_Event *e) {
+  if (e->type == SDL_KEYDOWN || e->type == SDL_MOUSEBUTTONDOWN || e->type == SDL_MOUSEWHEEL) ultimaInteracaoSync = SDL_GetTicks();
   if (musicaui_aberta()) {
     if (e->type == SDL_APP_WILLENTERBACKGROUND || e->type == SDL_APP_TERMINATING || e->type == SDL_QUIT)
       musicaui_fechar();
@@ -4301,13 +4046,6 @@ void app_evento(const SDL_Event *e) {
   // login, a tecla vermelha nao chegaria ali e o painel seria inutil onde ele
   // mais importa. Enquanto aberto ele engole todo o teclado, incluindo o KEYUP
   // do toque que o abriu ou fechou (ver a nota da armadilha em registro.c).
-#ifdef NV_ANDROID
-  // O Info do controle Android chega como F9 (o painel de registro). Com a
-  // folha de fontes aberta ele e dos DETALHES DA FONTE (#355); o registro
-  // continua na tecla vermelha / Ajustes, e aberto ele ainda fecha o painel.
-  if (e->type == SDL_KEYDOWN && e->key.keysym.sym == SDLK_F9 && stream_folha_aberta() &&
-      !registro_aberto()) { stream_folha_evento(e); return; }
-#endif
   if (registro_evento(e)) return;
   // O painel de envio do registro (Ajustes > Enviar registro, ou o "Enviar
   // agora" do painel): modal, come o teclado enquanto aberto.
@@ -4334,36 +4072,7 @@ void app_evento(const SDL_Event *e) {
   // O CARTAO DO CELULAR (celbotao.h), aberto de qualquer campo de texto: come
   // o teclado todo ate fechar.
   if (celb_evento(e)) return;
-  // O GUIA DA 2.0 (novidades20.h) e tela inteira e come o teclado todo,
-  // inclusive a AZUL (pula para o resumo). "Abrir o Guia de uso" leva a
-  // Ajustes › Sobre e ajuda › Guia de uso.
-  // O CARTAO DA 2.0.1 (novidades201.h): come o teclado todo; "Abrir a
-  // Central" fecha o cartao e abre a Central de controle no lugar.
-  // O DA 2.0.2 (novidades202.h) e igual, sem a Central.
-  // O CARTAO DA VERSAO ATUAL (novidades_cartao.h, 2.0.3 em diante) tambem.
-  if (novcartao_aberto()) {
-    novcartao_evento(e);
-    return;
-  }
-  if (novidades202_aberto()) {
-    novidades202_evento(e);
-    return;
-  }
-  if (novidades201_aberto()) {
-    novidades201_evento(e);
-    if (novidades201_pedido() == N201_PEDIU_CENTRAL && app_central_pode()) central_abrir();
-    return;
-  }
-  if (novidades20_aberto()) {
-    novidades20_evento(e);
-    if (novidades20_pedido() == N20_PEDIU_GUIA) {
-      menu_fechar();
-      ajustes_abrir_no_guia(0);
-      trocarTela(TELA_AJUSTES);
-      menu_definir_destino(MENU_AJUSTES);
-    }
-    return;
-  }
+
 
   // PORTA DE TESTE: F10 abre o Guia de TV de onde quer que o app esteja.
   //
@@ -4442,83 +4151,7 @@ void app_evento(const SDL_Event *e) {
   // A PERGUNTA DO PiP vem ANTES dele: ela decide o destino de um video que
   // esta no ar — o Voltar aqui escolhe "fechar o video", nao so fecha cartao.
   if (pipintro_aberto()) { pipintro_evento(e); return; }
-  if (novidades_aberto()) { novidades_evento(e); return; }
-  // O cartao da 1.1 vem logo depois, e come esquerda/direita como o do Social:
-  // sao sete paginas, e deixar a tecla vazar moveria o foco da home debaixo
-  // dele. O OK dele AVANCA e so fecha na ultima pagina — ver novidades11.c.
-  if (novidades11_aberto()) { novidades11_evento(e); return; }
-  if (novidades12_aberto()) { novidades12_evento(e); return; }
-  if (novidades13_aberto()) { novidades13_evento(e); return; }
-  if (novidades131_aberto()) { novidades131_evento(e); return; }
-  if (novidades132_aberto()) { novidades132_evento(e); return; }
-  if (novidades133_aberto()) { novidades133_evento(e); return; }
-  if (novidades134_aberto()) { novidades134_evento(e); return; }
-  if (novidades139_aberto()) { novidades139_evento(e); return; }
-  // O DA 1.4.2 VEM ANTES DO DA 1.4, e so um dos dois aparece (ver
-  // novidades142.c). "Rodar o diagnostico" abre a tela AQUI, no mesmo evento:
-  // deixar para o quadro seguinte daria ao proximo cartao da fila (telemetria)
-  // a chance de abrir por cima da tela nova.
-  if (novidades142_aberto()) {
-    novidades142_evento(e);
-    if (novidades142_pediu_diagnostico()) {
-      diagDaHome = 1;
-      trocarTela(TELA_DIAGNOSTICO);
-      menu_definir_destino(MENU_AJUSTES);
-    }
-    return;
-  }
-  // O DA 1.4.8 abre Ajustes (na cor) ou o teste de velocidade AQUI, no mesmo
-  // evento, pelo mesmo motivo do da 1.4.2 logo acima.
-  if (novidades148_aberto()) {
-    novidades148_evento(e);
-    switch (novidades148_pedido()) {
-      case N148_PEDIU_COR:
-        ajustes_abrir_na_cor();
-        trocarTela(TELA_AJUSTES);
-        menu_definir_destino(MENU_AJUSTES);
-        break;
-      case N148_PEDIU_VELOCIDADE:
-        // Mesmo caminho do atalho de Ajustes, mas o Voltar devolve a home, de
-        // onde a pessoa veio (diagDaHome), como o do cartao da 1.4.2.
-        diagDaHome = 1;
-        diagnostico_abrir_velocidade();
-        trocarTela(TELA_DIAGNOSTICO);
-        menu_definir_destino(MENU_AJUSTES);
-        break;
-      default: break;
-    }
-    return;
-  }
-  // O DA 1.7 (no lugar do da 1.6.6, que nunca saiu): "Abrir o Spotlight" fecha
-  // o cartao e abre a busca por cima da home. Aqui, no mesmo evento, pelo
-  // mesmo motivo do da 1.4.2 acima.
-  // O DA 1.8.0, o unico cartao de primeira vez daqui em diante
-  // (novidadesfila.h). "Abrir o guia" leva a Ajustes › Sobre e ajuda › Guia
-  // de uso, com "Voltar às novidades"; "Vidro ou sólido" pousa na Interface de
-  // vidro. Aqui, no mesmo evento, pelo mesmo motivo do da 1.4.2.
-  if (novidades180_aberto()) {
-    novidades180_evento(e);
-    switch (novidades180_pedido()) {
-      case N180_PEDIU_GUIA:
-        ajustes_abrir_no_guia(1);
-        trocarTela(TELA_AJUSTES);
-        menu_definir_destino(MENU_AJUSTES);
-        break;
-      case N180_PEDIU_VIDRO:
-        ajustes_abrir_no_vidro();
-        trocarTela(TELA_AJUSTES);
-        menu_definir_destino(MENU_AJUSTES);
-        break;
-      default: break;
-    }
-    return;
-  }
-  if (novidades170_aberto()) {
-    novidades170_evento(e);
-    if (novidades170_pedido() == N170_PEDIU_SPOT && spotPode()) spotAbrir(0);
-    return;
-  }
-  if (novidades1312_aberto()) { novidades1312_evento(e); return; }
+
   if (telemetria_aberto()) { telemetria_evento(e); return; }
   // O explicador do Social e da mesma familia, e come esquerda/direita:
   // deixar a tecla vazar para a home moveria o foco dela debaixo do cartao.
@@ -4641,7 +4274,6 @@ void app_evento(const SDL_Event *e) {
     }
     { char im[24];
       if (detail_aberto() && detail_pediu_amigos(im, sizeof im)) abrirSocialNoTitulo(im); }
-    if (detail_aberto() && detail_pediu_explorar()) abrirExplorarNoTitulo();
     return;
   }
   // O MENU DO CARTAZ ABERTO PELO PAINEL (segurar OK numa linha de Salvos)
@@ -4668,7 +4300,6 @@ void app_evento(const SDL_Event *e) {
   }
 
   switch (tela) {
-    case TELA_EXPLORAR:   explorar_evento(e);   break;
     case TELA_GUIA:       guia_evento(e);       break;
     case TELA_BUSCA:      busca_evento(e);      break;
     case TELA_BIBLIOTECA: biblioteca_evento(e); break;
@@ -4825,12 +4456,7 @@ static const char *homeTrailerBloqueio(void) {
   if (vertudo_aberta()) return "see-all";
   if (avisos_aberto() || avisos_cartao_aberto()) return "notices";
   if (sintro_aberto() || pipintro_aberto() || recintro_aberto() || telemetria_aberto()) return "intro";
-  if (novidades_aberto() || novidades11_aberto() || novidades12_aberto() ||
-      novidades13_aberto() || novidades131_aberto() || novidades132_aberto() ||
-      novidades133_aberto() || novidades134_aberto() || novidades139_aberto() || novidades1312_aberto() ||
-      novidades142_aberto() || novidades148_aberto() || novidades170_aberto() || novidades180_aberto() ||
-      novidades20_aberto() || novidades201_aberto() || novidades202_aberto() ||
-      novcartao_aberto() || dicascontrole_ocupado()) return "whats-new";
+  if (dicascontrole_ocupado()) return "whats-new";
   if (atualizacao_aberta() || agendaviso_aberto()) return "update-notice";
   if (recomenda_aberta() || recenviar_aberto() || pessoas_aberto()) return "recommend";
   if (faixas_aberta() || episodios_aberto() || stream_folha_aberta()) return "sheet";
@@ -4961,9 +4587,6 @@ void app_atualizar(float dt, Uint32 agora) {
   // unica saida honesta. Continuar na home mostraria o catalogo de exemplo do
   // pacote como se fosse o da pessoa.
   if (!sessao_logada()
-#ifdef NV_LINUX_DESKTOP
-      && !uiPreview
-#endif
      ) {
     perfilEncerrarSessao();
     perfis_invalidar_sessao();
@@ -5007,18 +4630,13 @@ void app_atualizar(float dt, Uint32 agora) {
 
   if (tela == TELA_ESCOLHA_PERFIL) {
     sync_passo((unsigned)agora);
-    // A HOME CONTINUA SE MONTANDO POR TRAS DA PERGUNTA.
-    //
-    // home_atualizar() comeca com sincronizarFileiras(), que e quem transforma
-    // o catalogo em fileiras. Sem esta linha, o catalogo que chega do cache e
-    // da rede enquanto a tela de escolha esta em pe ficaria parado, e a home so
-    // comecaria a montar DEPOIS da escolha — a pergunta cobraria do arranque os
-    // segundos que o cache de 844 ms existe para economizar. Custa uma
-    // atualizacao sem desenho: a tela de escolha e opaca e a home nao e pintada
-    // aqui (ver desenharTelas).
-    home_oculta(1);          // montada, nao pintada: o destaque nao gira
-    home_atualizar(dt, agora);
-    home_oculta(0);
+    // So monta a Home depois de confirmar o perfil. Durante a preparacao,
+    // ela continua aquecendo oculta, sem reconstruir a sessao anterior.
+    if (!perfis_precisa_escolher()) {
+      home_oculta(1);
+      home_atualizar(dt, agora);
+      home_oculta(0);
+    }
     perfilsel_atualizar(dt, agora);
     if (perfilsel_pediu_repetir()) { sync_iniciar(); return; }
     if (perfilsel_quer_sair()) {
@@ -5028,6 +4646,7 @@ void app_atualizar(float dt, Uint32 agora) {
       if (perfis_pode_dispensar()) {
         perfis_manter_ativo();
         perfilsel_continuar_ativo();
+        psestilos_aliviar();
         // A tela de escolha pode ter parado o primeiro ciclo enquanto ainda
         // aguardava uma resposta. Idempotente quando ele ja esta rodando.
         sync_iniciar();
@@ -5053,6 +4672,7 @@ void app_atualizar(float dt, Uint32 agora) {
                (unsigned)(agora - trocaPerfilDesde));
         fflush(stdout);
         perfilsel_preparar(0, agora);
+        psestilos_aliviar();
         home_ir_topo();
         tela = TELA_HOME;
       }
@@ -5074,7 +4694,10 @@ void app_atualizar(float dt, Uint32 agora) {
 
   // Um ciclo por vez, e so quando a conta existe. O passo e barato: sem fio
   // terminado ele nao faz nada.
-  sync_passo((unsigned)agora);
+  /* Network results remain queued during navigation and initial decoder/seek. */
+  if ((Uint32)(agora - ultimaInteracaoSync) >= 200u &&
+      !(player_aberto() && player_aberto_ha_ms() < 15000u))
+    sync_passo((unsigned)agora);
   agenda_filmes_atualizar();
   // SERVIDOR DA CONTA FORA DO AR (#215): um aviso discreto na ilha, uma vez
   // por queda, e retirado quando ele volta. Sem isto a pessoa via a home sem
@@ -5122,34 +4745,8 @@ void app_atualizar(float dt, Uint32 agora) {
   //
   // Chamar em todo quadro nao custa: a decisao acontece uma vez e o modulo a
   // guarda — a leitura do arquivo de bandeira nao se repete.
-  // A 1.8.0 PRIMEIRO, e antes da fila antiga: novidades180_primeira_vez
-  // prepara a fila (grava as marcas antigas, novidadesfila.h) e abre o cartao;
-  // os *_primeira_vez() de baixo ja encontram tudo visto.
-  // DA 2.0 EM DIANTE o guia novo e o unico "primeira vez" (novidades20.h):
-  // ele prepara a fila antiga, grava a marca da 1.8.0 e abre uma vez, para
-  // quem atualiza e para quem instala do zero. novidades180_primeira_vez nao
-  // e mais chamada: o cartao da 1.8.0 so vive como cena do Guia de uso.
-  // A 2.0.1 decide ANTES do guia da 2.0, no mesmo quadro: ela olha se o guia
-  // ja foi visto antes de ele gravar a marca (novidades201.h).
-  // O CARTAO DA VERSAO ATUAL (novidades_cartao.h) decide antes de todos: ele
-  // grava as marcas da 2.0.1 e da 2.0.2, que entao nao abrem nunca mais. A
-  // condicao (Home pronta, sem player nem pagina do titulo) mora nele, onde o
-  // teste a exercita.
-  novcartao_decidir(tela == TELA_HOME && homePronta, player_aberto(), detail_aberto());
-  if (tela == TELA_HOME && homePronta && !player_aberto() && !detail_aberto()) {
-    // A 2.0.2 antes da 2.0.1: ela substitui o cartao da 2.0.1.
-    novidades202_primeira_vez();
-    novidades201_primeira_vez();
-    novidades20_primeira_vez();
-  }
-  if (tela == TELA_HOME && homePronta && !player_aberto() && !detail_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !novidades201_aberto() && !novidades202_aberto() && !novcartao_aberto() && !dicascontrole_ocupado()) {
-    // Esta e a primeira explicacao da versao: aparece antes dos demais
-    // cartoes de onboarding. Depois de OK, o bloco abaixo continua a fila
-    // antiga no quadro seguinte.
-    // Com o cartao da 1.4.2 ainda por vir, a apresentacao espera: ele mesmo
-    // convida para o diagnostico e, ao fechar, dispensa a apresentacao nesta
-    // sessao (novidades142.c) — dois avisos seguidos sobre a mesma coisa.
-    if (!novidades142_pendente()) diagnostico_intro_primeira_vez();
+  if (tela == TELA_HOME && homePronta && !player_aberto() && !detail_aberto() && !dicascontrole_ocupado()) {
+    diagnostico_intro_primeira_vez();
     if (!diagnostico_intro_aberto()) {
     registro_aviso_primeira_vez();
     // Mesmo lugar e mesma razao: o explicador de "Salvos" fala de uma tecla do
@@ -5157,95 +4754,10 @@ void app_atualizar(float dt, Uint32 agora) {
     // ensina nada. Ele tambem espera o cartao do log sair — dois cartoes de
     // primeira vez ao mesmo tempo seria um em cima do outro.
     if (!registro_aberto()) sintro_primeira_vez();
-    // O cartao do Guia de TV espera o de Salvos sair — dois cartoes de
-    // primeira vez ao mesmo tempo seria um em cima do outro.
-    if (!registro_aberto() && !sintro_aberto()) novidades_primeira_vez();
-    // O CARTAO DA 1.1 VEM DEPOIS DO DO GUIA, e nao antes: quem instala esta
-    // versao vindo de uma anterior a do Guia recebe os dois, e o do Guia fala
-    // de um recurso que a 1.1 pressupoe (o botao AZUL abrindo o guia aparece na
-    // pagina dos botoes coloridos). Ler na ordem em que as coisas chegaram e o
-    // unico jeito de a segunda explicacao fazer sentido.
-    //
-    // Ele vem ANTES do aviso de versao nova, e isso importa: o de versao nova
-    // fala da PROXIMA atualizacao, e a pagina 5 deste explica como ela se
-    // instala. Invertido, a pessoa apertaria "Atualizar agora" antes de saber
-    // o que acontece sem o Homebrew Channel.
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !pipintro_aberto())
-      novidades11_primeira_vez();
-    // O cartao da 1.2 so depois do da 1.1: quem nunca viu nenhum ve na ordem
-    // em que as coisas chegaram, e quem ja viu o da 1.1 ve so o da 1.2.
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !pipintro_aberto())
-      novidades12_primeira_vez();
-    // O da 1.3 depois do da 1.2, pela mesma razao.
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !pipintro_aberto())
-      novidades13_primeira_vez();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !pipintro_aberto())
-      novidades131_primeira_vez();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !pipintro_aberto())
-      novidades132_primeira_vez();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() && !pipintro_aberto())
-      novidades133_primeira_vez();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() &&
-        !novidades134_aberto() && !pipintro_aberto())
-      novidades134_primeira_vez();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() &&
-        !novidades134_aberto() && !novidades139_aberto() && !pipintro_aberto())
-      novidades139_primeira_vez();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() &&
-        !novidades134_aberto() && !novidades139_aberto() && !novidades142_aberto() &&
-        !pipintro_aberto())
-      novidades142_primeira_vez();
-    // O da 1.4.8 depois do da 1.4.2: na ordem em que as coisas chegaram.
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() &&
-        !novidades134_aberto() && !novidades139_aberto() && !novidades142_aberto() &&
-        !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !pipintro_aberto())
-      novidades148_primeira_vez();
-    // A 1.7 no lugar da 1.6.0 (a 1.6.6 nunca saiu; como a 1.6.0 tomou o da
-    // 1.5.2): uma apresentacao por aparelho, depois da cor viva. Quem nao viu
-    // a da 1.6.0 nao a recebe mais; a desta versao cobre.
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() &&
-        !novidades134_aberto() && !novidades139_aberto() && !novidades142_aberto() &&
-        !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !pipintro_aberto())
-      novidades170_primeira_vez();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() &&
-        !novidades134_aberto() && !novidades139_aberto() && !novidades142_aberto() && !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() &&
-        !novidades1312_aberto() && !pipintro_aberto())
-      novidades1312_primeira_vez();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() &&
-        !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() &&
-        !novidades134_aberto() && !novidades139_aberto() && !novidades1312_aberto() && !novidades142_aberto() && !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !telemetria_aberto() && !pipintro_aberto())
+    if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto())
       telemetria_primeira_vez();
-    // AVISO DE VERSAO NOVA: a consulta ao GitHub so parte quando a home esta
-    // de pe (nao disputa a rede com o catalogo), e o cartao so abre quando
-    // nenhum outro cartao de primeira vez esta aberto. Chamada a cada quadro:
-    // a agenda (atualizacao_agenda_vence) decide se ja e hora de reconsultar
-    // (~6 h), e nunca com o mini player tocando.
     if (!player_mini_ativo()) atualizacao_verificar();
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() && !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() && !novidades142_aberto() && !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !pipintro_aberto())
+    if (!registro_aberto() && !sintro_aberto() && !pipintro_aberto())
       atualizacao_mostrar_se_houver();
     // RECOMENDACAO DE UM AMIGO: a sondagem parte daqui pelo mesmo motivo que a
     // do GitHub — com a home de pe ela nao disputa a rede com o catalogo. Sem
@@ -5255,32 +4767,29 @@ void app_atualizar(float dt, Uint32 agora) {
 #ifndef NV_LEVE
     recomenda_verificar();
 #endif
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() && !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() && !novidades134_aberto() && !novidades139_aberto() && !novidades1312_aberto() && !novidades142_aberto() && !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta())
+    if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta())
       recomenda_mostrar_se_houver();
     // EXPLICADOR DAS TELAS SOCIAIS: mesmas guardas de todos os outros, mais
     // a do cartao de recomendacao recebida — dois cartoes ao mesmo tempo
     // seria um por cima do outro. Ele proprio nao abre num pacote sem
     // NUVIO_REC_URL (recomenda_ativo), e por isso nao ha guarda aqui: um
     // anuncio de recurso que nao esta no pacote e pior que silencio.
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() && !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() && !novidades134_aberto() && !novidades139_aberto() && !novidades1312_aberto() && !novidades142_aberto() && !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta() &&
+    if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta() &&
         !recomenda_aberta())
       recintro_primeira_vez();
     // LEMBRETE VENCIDO: o unico aviso que esta TV consegue dar. Ultimo da fila
     // pela mesma razao de todos os outros — dois cartoes juntos seria um por
     // cima do outro —, e sem consulta de rede nenhuma: o que ele mostra ja
     // esta em disco desde que o dono apertou "Lembrar-me".
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() && !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() && !novidades134_aberto() && !novidades139_aberto() && !novidades1312_aberto() && !novidades142_aberto() && !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta() &&
+    if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta() &&
         !recomenda_aberta() && !recintro_aberto())
       agendaviso_mostrar_se_houver();
     // O CARTAO DO CRASH, depois do lembrete e pelas mesmas regras: um cartao
     // por vez, com a home de pe.
-    if (!registro_aberto() && !sintro_aberto() && !novidades_aberto() &&
-        !novidades11_aberto() && !novidades12_aberto() && !novidades13_aberto() && !novidades131_aberto() && !novidades132_aberto() && !novidades133_aberto() && !novidades134_aberto() && !novidades139_aberto() && !novidades1312_aberto() && !novidades142_aberto() && !novidades148_aberto() && !novidades170_aberto() && !novidades180_aberto() && !novidades20_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta() &&
+    // avisos_mostrar_se_houver desativado completamente conforme solicitacao do usuario
+    /* if (!registro_aberto() && !sintro_aberto() && !telemetria_aberto() && !pipintro_aberto() && !atualizacao_aberta() &&
         !recomenda_aberta() && !recintro_aberto() && !agendaviso_aberto())
-      avisos_mostrar_se_houver();
+      avisos_mostrar_se_houver(); */
     }
   }
 
@@ -5519,17 +5028,7 @@ void app_atualizar(float dt, Uint32 agora) {
     if (buscaAjustes == 2) spot_reabrir_ajustes();
     else if (buscaAjustes == 1) spot_abrir_ajustes(0);
   }
-  // "Voltar às novidades" no Guia de uso aberto pelo cartao da 1.8.0: a home
-  // e o cartao de novo, com o foco no guia.
-  // Ajustes › Sobre e ajuda › Novidades 2.0: o guia por cima de Ajustes, do
-  // comeco; ao fechar, Ajustes continua onde estava.
-  if (tela == TELA_AJUSTES && ajustes_pediu_novidades20()) novidades20_abrir(0);
   if (tela == TELA_AJUSTES && ajustes_pediu_dicascontrole()) dicascontrole_abrir();
-  if (tela == TELA_AJUSTES && ajustes_pediu_novidades()) {
-    trocarTela(TELA_HOME);
-    menu_definir_destino(MENU_INICIO);
-    novidades180_reabrir();
-  }
   // Os atalhos de tela do Guia de uso ("Abrir o Guia de TV" e cia.): a tela e
   // o item do menu, como se a pessoa tivesse ido pelo menu.
   if (tela == TELA_AJUSTES) {
@@ -5537,7 +5036,6 @@ void app_atualizar(float dt, Uint32 agora) {
       case AJ_TELA_GUIA_TV:    trocarTela(TELA_GUIA);       menu_definir_destino(MENU_GUIA);       break;
       case AJ_TELA_BIBLIOTECA: trocarTela(TELA_BIBLIOTECA); menu_definir_destino(MENU_BIBLIOTECA); break;
       case AJ_TELA_AGENDA:     trocarTela(TELA_AGENDA);     menu_definir_destino(MENU_AGENDA);     break;
-      case AJ_TELA_EXPLORAR:   trocarTela(TELA_EXPLORAR);   menu_definir_destino(MENU_EXPLORAR);   break;
       case AJ_TELA_PERFIL:     trocarTela(TELA_PERFIL);     menu_definir_destino(MENU_PERFIL);     break;
       default: break;
     }
@@ -5600,8 +5098,7 @@ void app_atualizar(float dt, Uint32 agora) {
 
   // Fora da home, o Back tem para onde voltar: a home. So nela ele fecha o app.
   if (tela != TELA_HOME) {
-    int fechar = (tela == TELA_EXPLORAR   && explorar_quer_sair())
-              || (tela == TELA_GUIA       && guia_quer_sair())
+    int fechar = (tela == TELA_GUIA       && guia_quer_sair())
               || (tela == TELA_BUSCA      && busca_quer_sair())
               || (tela == TELA_BIBLIOTECA && biblioteca_quer_sair())
               || (tela == TELA_AGENDA     && agendaui_quer_sair())
@@ -5664,7 +5161,6 @@ void app_atualizar(float dt, Uint32 agora) {
         if (player_mini_ativo() && player_id_canal()[0]) guiaComCanalNoAr();
         else trocarTela(TELA_GUIA);
         break;
-      case MENU_EXPLORAR:   trocarTela(TELA_EXPLORAR);   break;
       case MENU_BUSCAR:     trocarTela(TELA_BUSCA);      break;
       case MENU_BIBLIOTECA: trocarTela(TELA_BIBLIOTECA); break;
       case MENU_AGENDA:     trocarTela(TELA_AGENDA);     break;
@@ -5685,8 +5181,7 @@ void app_atualizar(float dt, Uint32 agora) {
     SpotPedido pedPessoa;
     if (tela == TELA_HOME && home_pediu_abrir()) {
       if (home_item_focado(&it)) abrirTitulo(&it, 1, 1);
-    } else if (tela == TELA_EXPLORAR && explorar_pediu_abrir(&idx)) {
-      abrirPorIndice(idx);
+
     } else if (tela == TELA_HOME && home_pediu_tocar()) {
       // OK no card da retomada com "OK no card" = Retomar (issue #93): abre a
       // pagina do titulo E pede reproducao no mesmo passe. A pagina fica
@@ -5876,12 +5371,7 @@ void app_atualizar(float dt, Uint32 agora) {
       if (ci && cwTocarT >= 0 && cwTocarE > 0)
         cat_id_stream(detail_indice(), cwTocarT, cwTocarE, alvoPreparo, sizeof alvoPreparo);
       idBaseDoTitulo(basePreparo, sizeof basePreparo);
-      int lembradaPreparo = basePreparo[0] ? fontepref_escolher(basePreparo) : -1;
-#ifdef NV_ANDROID
-      if (doInicio && preparo.token) {
-        player_precarregar_cancelar(preparo.token); preparo.token = 0;
-      }
-#endif
+      int lembradaPreparo = -1;
       int usouPreparo = !ajustes_fonte_manual() &&
                        preparoUsar(alvoPreparo, lembradaPreparo, &idxPreparado);
       // Armado antes da abertura: o proximo quadro nao cancela o worker
@@ -5987,7 +5477,7 @@ void app_atualizar(float dt, Uint32 agora) {
   // ordem, ate achar uma que leve ao arquivo — e so entao liga o video.
   if (aguardandoFonte == 1 &&
       (addons_estado() != ADD_BUSCANDO ||
-       ((player_id_canal()[0] || !fontefalha_ativa()) && autoParcialPronto()))) {
+       (player_id_canal()[0] && autoParcialPronto()))) {
     unsigned geracao = novaGeracaoFonte();
     // QUANTO O PLAY ESPEROU PELA DECISAO, e por que ela saiu (#202). Medido no
     // D1 so havia a decisao parcial; a completa nao deixava rastro.
@@ -6062,6 +5552,7 @@ void app_atualizar(float dt, Uint32 agora) {
       if (lembrada < 0)
         lembrada = base[0] ? (ajustes_fonte_manual() ? fontepref_escolher_manual(base)
                                                      : fontepref_escolher(base)) : -1;
+      if (!ajustes_fonte_manual()) lembrada = -1;
       stream_preferir(lembrada);
       // QUEM ESCOLHE E A PESSOA, quando ela pediu isso em Ajustes.
       //
@@ -6241,9 +5732,6 @@ void app_atualizar(float dt, Uint32 agora) {
   // preta. O caso que motivou o conserto (18/09) tinha loadCompleted.
   recuperarErroFonte();
   if (canalFonteIdx >= 0 && (player_aberto() || player_mini_ativo()) &&
-#ifdef NV_ANDROID
-      !video_recuperando_live() &&
-#endif
       !player_quer_sair() && player_id_canal()[0]) {
     // TRAVOU DEPOIS DE ABRIR conta como morta, e sem isto nao contava.
     //
@@ -6287,13 +5775,6 @@ void app_atualizar(float dt, Uint32 agora) {
         video_buffer_fim() > 0.5 && !video_decoder_anunciou();
     unsigned bufferMs = video_bufferando_ms();
     unsigned travaMs = CANAL_TRAVA_MS, paradoMs = NV_LS_PARADO_MS;
-#ifdef NV_ANDROID
-    if (bufferMs) {
-      paradoMs = nv_ls_buffer_prazo(video_live_segmento_ms());
-      // Give the same-source watchdog its normal four-second lead over failover.
-      if (paradoMs > NV_LS_PARADO_MS) travaMs = paradoMs + 4000u;
-    }
-#endif
     int morta = player_fonte_falhou() || video_falhou() ||
         (player_carregando() && desde > prazo && video_buffer_fim() <= 0.5) ||
         (player_carregando() && desde > teto) ||
@@ -6316,9 +5797,6 @@ void app_atualizar(float dt, Uint32 agora) {
         snprintf(lsId, sizeof lsId, "%s", player_id_canal());
       }
       double livePos = video_pronto() ? video_pos() : 0.0, liveFim = video_buffer_fim();
-#ifdef NV_ANDROID
-      if (video_pronto()) video_live_progresso(&livePos, &liveFim);
-#endif
       int estavaPendente = liveStall.pendente;
       ls = nv_ls_passo_buf_prazo(&liveStall, SDL_GetTicks(), livePos,
                            video_pronto(), player_pausa_pessoa(), video_terminou(),
@@ -6339,11 +5817,6 @@ void app_atualizar(float dt, Uint32 agora) {
         const Stream *mesma = stream_item(canalFonteIdx);
         if (mesma) {
           static char viaProxy[NV_MEDIA_URL_MAX + 128];
-#ifdef NV_TPK
-          if (video_terminou() && !liveStall.pendente)
-            printf("[canal] tpk EOF de live: reabrindo a fonte %d imediatamente (sem tentativa)\n", canalFonteIdx);
-          else
-#endif
           printf("[canal] reabrindo a fonte %d (tentativa %d/%d)\n", canalFonteIdx,
                  liveStall.tentativa, NV_LS_MAX);
           fflush(stdout);
@@ -6790,28 +6263,11 @@ void app_atualizar(float dt, Uint32 agora) {
         trocarTela(TELA_HOME);
         menu_definir_destino(MENU_INICIO);
         ilha_minimizar(fundoVoo[0] ? fundoVoo : NULL);
-#ifdef NV_ANDROID
-        // A sessao ficou pausada atras da home: o voo comeca DISSOLVENDO a
-        // partir do proprio video parado (ilha_minimizar_dissolver).
-        ilha_minimizar_dissolver(player_retido());
-#endif
       } }
     }
   }
 
   cwRetidoSincronizar();
-#ifdef NV_TOUCH_UI
-  { static float guiaW, guiaH;
-    if (guiaW != NV_TELA_W || guiaH != NV_TELA_H) {
-      guiaW = NV_TELA_W; guiaH = NV_TELA_H;
-      if (player_mini_no_guia_ativo()) {
-        float x, y, w, h;
-        guia_preview_rect(&x, &y, &w, &h);
-        player_mini_no_guia(x, y, w, h);
-      }
-    }
-  }
-#endif
   player_atualizar(dt, agora);
   // A barra por cima da pagina: o trailer do fundo fica mudo enquanto ela
   // esta aberta (detail_sob_menu). O pedido de barra da pagina e lido em
@@ -6870,7 +6326,6 @@ void app_atualizar(float dt, Uint32 agora) {
       abrirTitulo(&it, 0, 1);
     } }
   switch (tela) {
-    case TELA_EXPLORAR:   explorar_atualizar(dt, agora);   break;
     case TELA_BUSCA:      busca_atualizar(dt, agora);      break;
     case TELA_BIBLIOTECA: biblioteca_atualizar(dt, agora); break;
     case TELA_AGENDA:     agendaui_atualizar(dt, agora);   break;
@@ -6894,24 +6349,7 @@ void app_atualizar(float dt, Uint32 agora) {
   recenviar_atualizar(dt, agora);
   pessoas_atualizar(dt, agora);
   sintro_atualizar(dt, agora);
-  novidades_atualizar(dt, agora);
-  novidades11_atualizar(dt, agora);
-  novidades12_atualizar(dt, agora);
-  novidades13_atualizar(dt, agora);
-  novidades131_atualizar(dt, agora);
-  novidades132_atualizar(dt, agora);
-  novidades133_atualizar(dt, agora);
-  novidades134_atualizar(dt, agora);
-  novidades139_atualizar(dt, agora);
-  novidades1312_atualizar(dt, agora);
-  novidades142_atualizar(dt, agora);
-  novidades148_atualizar(dt, agora);
-  novidades170_atualizar(dt, agora);
-  novidades180_atualizar(dt, agora);
-  novidades20_atualizar(dt, agora);
-  novidades201_atualizar(dt, agora);
-  novidades202_atualizar(dt, agora);
-  novcartao_atualizar(dt, agora);
+
   dicascontrole_home_livre(app_home_recebe_teclas(), dt);
   dicascontrole_atualizar(dt, agora);
   telemetria_atualizar(dt, agora);
@@ -6948,19 +6386,9 @@ void app_atualizar(float dt, Uint32 agora) {
 // descarta, antes de se desenhar, os alvos de quem ficou por baixo — o
 // ponteiro so pode focar o que as setas focariam. A pergunta e a mesma que o
 // roteador de app_evento faz ("esta aberta?"), so que na ordem do desenho.
-#ifdef NV_TOUCH_UI
-#define CAMADA_SE(aberta) do { if (aberta) { \
-  ponteiro_camada(); \
-  if (layout_modo_mobile()) ponteiro_alvo(0, 0, NV_TELA_W, NV_TELA_H, NULL, NULL, 0, 0); \
-} } while (0)
-#else
 #define CAMADA_SE(aberta) do { if (aberta) ponteiro_camada(); } while (0)
-#endif
 static void desenharCtxDoPainel(Uint32 agora) {
   CAMADA_SE(ctx_aberto()
-#ifdef NV_TOUCH_UI
-            && !(telefoneui_ativo() && ctx_inline_painel_ativo())
-#endif
   );
   ctx_desenhar(agora);
 }
@@ -6973,11 +6401,7 @@ static void desenharAtrasDoPainel(void *ctx) {
   // "Ver tudo" cobre a tela de tras por completo (fundo opaco), entao a home
   // nao precisa ser desenhada por baixo — a mesma conta do detail_cobre_tela.
   if (!detail_cobre_tela() && !vertudo_aberta()) {
-#ifdef NV_TOUCH_UI
-    sidebarToqueRegistrar(0);
-#endif
     switch (tela) {
-      case TELA_EXPLORAR:   explorar_desenhar(agora);   break;
       case TELA_GUIA:       guia_desenhar(agora);       break;
       case TELA_BUSCA:      busca_desenhar(agora);      break;
       case TELA_BIBLIOTECA: biblioteca_desenhar(agora); break;
@@ -6993,9 +6417,6 @@ static void desenharAtrasDoPainel(void *ctx) {
     }
   }
   CAMADA_SE(vertudo_aberta());
-#ifdef NV_TOUCH_UI
-  if (!detail_cobre_tela()) sidebarToqueRegistrar(2);
-#endif
   if (!detail_cobre_tela()) vertudo_desenhar(agora);
   // Com o painel de Salvos na tela o menu do cartaz e desenhado DEPOIS dele
   // (desenharTelas): e o painel que o abre, e por baixo ele ficaria sob o veu.
@@ -7004,9 +6425,6 @@ static void desenharAtrasDoPainel(void *ctx) {
     ctx_desenhar(agora);
   }
   CAMADA_SE(detail_aberto());
-#ifdef NV_TOUCH_UI
-  sidebarToqueRegistrar(1);
-#endif
   detail_desenhar(agora);
   // Aberto de dentro da pagina do titulo, o menu vai POR CIMA dela.
   if (!spainel_visivel() && detail_aberto() && ctx_aberto()) {
@@ -7044,7 +6462,7 @@ static void desenharAtrasDoPainel(void *ctx) {
     menu_pilula_mostrar(vertudo_aberta() || detail_aberto() ? -1.0f   // "Ver tudo"/colecao/pagina tem cabecalho proprio
                         : tela == TELA_HOME ? home_topo_fracao()
                         : ajustes_menu_topo() ? -1.0f   // #461: a barra no topo fechada so mora na home
-                        : (tela == TELA_EXPLORAR || tela == TELA_BUSCA ||
+                        : (tela == TELA_BUSCA ||
                            tela == TELA_BIBLIOTECA || tela == TELA_AGENDA ||
                            tela == TELA_PERFIL || tela == TELA_AJUSTES) ? 1.0f : -1.0f);
     CAMADA_SE(menu_aberto());
@@ -7077,9 +6495,6 @@ static void desenharTelas(Uint32 agora) {
 
   // Estado vazio de verdade, em vez de uma tela preta que parece travamento.
   if (!homePronta && tela == TELA_HOME && !player_aberto() && !detail_aberto()) {
-#ifdef NV_TOUCH_UI
-    sidebarToqueRegistrar(0);
-#endif
     GfxRect fundo = { 0, 0, NV_TELA_W, NV_TELA_H };
     TxtLinha t, sb;
     gfx_cor(fundo, 0.0f, NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
@@ -7147,9 +6562,6 @@ static void desenharTelas(Uint32 agora) {
   // dela (streams.c) e por isso nao a esconde mais.
   if (player_aberto()) {
     estatvivo_desenhar(agora);
-#ifdef NV_TOUCH_UI
-    if (telefoneui_ativo()) { CAMADA_SE(central_aberta()); }
-#endif
     central_desenhar(agora); plrilha_desenhar(agora);
     if (episodios_aberto() && sinopse_aberta()) sinopse_desenhar();
   }
@@ -7171,11 +6583,7 @@ static void desenharTelas(Uint32 agora) {
 // ilha nao passam por aqui — eles aparecem em qualquer tela fora do player.
 static int spotVeuPronto;   // o veu do Spotlight ja esta na copia congelada
 static int relogioCamadaAberta(void) {
-  return sintro_aberto() || novidades_aberto() || novidades11_aberto() || novidades12_aberto() ||
-      novidades13_aberto() || novidades131_aberto() || novidades132_aberto() ||
-      novidades133_aberto() || novidades134_aberto() || novidades139_aberto() ||
-      novidades1312_aberto() || novidades142_aberto() || novidades148_aberto() ||
-      novidades170_aberto() || novidades180_aberto() || novidades20_aberto() || novidades201_aberto() || novidades202_aberto() || novcartao_aberto() || telemetria_aberto() || recintro_aberto() ||
+  return sintro_aberto() || telemetria_aberto() || recintro_aberto() ||
       atualizacao_aberta() || agendaviso_aberto() || avisos_cartao_aberto() ||
       glem_cartao_aberto() || recenviar_aberto() || pessoas_aberto() ||
       recomenda_aberta() || pipintro_aberto() || diagnostico_intro_aberto();
@@ -7204,7 +6612,7 @@ static int relogioCabe(void) {
   // estica para a pagina.
   if (detail_aberto() && detail_relogio_oculto()) return 0;
   if (tela == TELA_HOME) { if (!homePronta) return 0; }
-  else if (tela != TELA_EXPLORAR && tela != TELA_BUSCA &&
+  else if (tela != TELA_BUSCA &&
            tela != TELA_BIBLIOTECA && tela != TELA_PERFIL && tela != TELA_SOCIAL &&
            tela != TELA_ADDONS && tela != TELA_PLUGINS && tela != TELA_AGENDA) return 0;
   // O MENU ABERTO NAO ESCONDE MAIS O RELOGIO (Glass UI, mockup "ilha" tela 1):
@@ -7215,75 +6623,10 @@ static int relogioCabe(void) {
   return 1;
 }
 
-#ifdef NV_TOUCH_UI
-static int playerToquePermitido(void) {
-  if (!app_central_pode() || menu_aberto() || spainel_aberto() ||
-      central_aberta() || ilha_modal_aberto() || celb_aberto() || ctx_aberto() ||
-      recenviar_aberto() || pessoas_aberto() || stream_folha_aberta() ||
-      faixas_aberta() || episodios_aberto() || guia_overlay_aberta() || avisos_aberto() ||
-      relogioCamadaAberta()) return 0;
-  if (tela == TELA_DIAGNOSTICO && diagnostico_apresentacao_aberta()) return 0;
-  if (tela == TELA_AJUSTES && !ajustes_relogio_cabe()) return 0;
-  if (tela == TELA_AGENDA && agendaui_menu_aberto()) return 0;
-  return 1;
-}
-static int miniToquePermitido(void) {
-  if (player_aberto() || !playerToquePermitido()) return 0;
-  if (telefoneui_ativo() && tela == TELA_AJUSTES && ajustes_edicao_ativa()) return 0;
-  // In the Guide its own preview and modal controls own the video rectangle.
-  return tela != TELA_GUIA;
-}
-#endif
 
 void app_desenhar(Uint32 agora) {
   relogioFocoValidar();
-  // O GUIA DA 2.0 e tela inteira e opaco: nada do app por baixo (uma camada
-  // de tela cheia a menos; o fundo dele e o assado do Borrada).
-  if (novidades20_aberto() && !registro_aberto() && !player_aberto()) {
-    gfx_sem_recorte();
-    gfx_cor((GfxRect){0, 0, NV_TELA_W, NV_TELA_H}, 0,
-            NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
-    ponteiro_camada();
-    novidades20_desenhar(agora);
-    return;
-  }
-  // O CARTAO DA 2.0.1 cobre quase a tela inteira: o app por baixo nao e
-  // pintado (uma camada de tela cheia a menos na Mali). O esmaecer de saida
-  // vem pelo caminho de baixo, por cima do app que ja voltou.
-  if (novidades201_aberto() && !registro_aberto() && !player_aberto()) {
-    gfx_sem_recorte();
-    gfx_cor((GfxRect){0, 0, NV_TELA_W, NV_TELA_H}, 0,
-            NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
-    ponteiro_camada();
-    novidades201_desenhar(agora);
-    return;
-  }
-  if (novidades202_aberto() && !registro_aberto() && !player_aberto()) {
-    gfx_sem_recorte();
-    gfx_cor((GfxRect){0, 0, NV_TELA_W, NV_TELA_H}, 0,
-            NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
-    ponteiro_camada();
-    novidades202_desenhar(agora);
-    return;
-  }
-  if (novcartao_aberto() && !registro_aberto() && !player_aberto()) {
-    gfx_sem_recorte();
-    gfx_cor((GfxRect){0, 0, NV_TELA_W, NV_TELA_H}, 0,
-            NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
-    ponteiro_camada();
-    novcartao_desenhar(agora);
-    return;
-  }
-  // The highlights modal owns input and covers almost the whole screen.
-  // Do not rasterize Home text or punch trailer holes through its backdrop.
-  if (novidades180_aberto() && !registro_aberto() && !player_aberto()) {
-    gfx_sem_recorte();
-    gfx_cor((GfxRect){0, 0, NV_TELA_W, NV_TELA_H}, 0,
-            NV_COR_FUNDO_R, NV_COR_FUNDO_G, NV_COR_FUNDO_B, 1.0f);
-    ponteiro_camada();
-    novidades180_desenhar(agora);
-    return;
-  }
+
   // COM O PAINEL DE LOG ABERTO A INTERFACE NAO E PINTADA.
   //
   // O painel e um cartao de tela quase cheia e opaco (alpha 0.94): pintar a
@@ -7305,14 +6648,6 @@ void app_desenhar(Uint32 agora) {
   // ainda chegava aparecer. Nada de congelar com video no ar (o PiP pinta o
   // furo) nem com o painel de Salvos, que usa o mesmo FBO.
   { static int pronto, refeitas, regCongelado;
-#ifdef NV_TOUCH_UI
-    static float fundoW, fundoH;
-    static unsigned fundoGeracao;
-    if (fundoW != NV_TELA_W || fundoH != NV_TELA_H || fundoGeracao != gfx_snap_geracao()) {
-      pronto = refeitas = regCongelado = 0;
-      fundoW = NV_TELA_W; fundoH = NV_TELA_H;
-    }
-#endif
     static unsigned revPronta;
     static Uint32 desde;
     static const Uint32 REFAZ[] = { 400, 1500, 4000 };
@@ -7356,53 +6691,14 @@ void app_desenhar(Uint32 agora) {
       if (regCongelado) gfx_snap_desenhar();
     } else desenharTelas(agora);
     if (!registro_aberto()) regCongelado = 0;
-#ifdef NV_TOUCH_UI
-    fundoGeracao = gfx_snap_geracao();
-#endif
   }
   // O explicador fica ACIMA de qualquer tela (menos do painel de log, que e
   // ferramenta de diagnostico): ele e a primeira coisa que a pessoa ve depois
   // desta atualizacao, e nada pode aparecer por cima dele.
-#ifdef NV_TOUCH_UI
-  player_mini_toque_guarda(miniToquePermitido);
-  player_toque_modal_guarda(playerToquePermitido);
-#endif
   player_mini_desenhar(agora);
   CAMADA_SE(sintro_aberto());
   if (!registro_aberto()) sintro_desenhar(agora);
-  CAMADA_SE(novidades_aberto());
-  if (!registro_aberto()) novidades_desenhar(agora);
-  CAMADA_SE(novidades11_aberto());
-  if (!registro_aberto()) novidades11_desenhar(agora);
-  CAMADA_SE(novidades12_aberto());
-  if (!registro_aberto()) novidades12_desenhar(agora);
-  CAMADA_SE(novidades13_aberto());
-  if (!registro_aberto()) novidades13_desenhar(agora);
-  CAMADA_SE(novidades131_aberto());
-  if (!registro_aberto()) novidades131_desenhar(agora);
-  CAMADA_SE(novidades132_aberto());
-  if (!registro_aberto()) novidades132_desenhar(agora);
-  CAMADA_SE(novidades133_aberto());
-  if (!registro_aberto()) novidades133_desenhar(agora);
-  CAMADA_SE(novidades134_aberto());
-  if (!registro_aberto()) novidades134_desenhar(agora);
-  CAMADA_SE(novidades139_aberto());
-  if (!registro_aberto()) novidades139_desenhar(agora);
-  CAMADA_SE(novidades1312_aberto());
-  if (!registro_aberto()) novidades1312_desenhar(agora);
-  CAMADA_SE(novidades142_aberto());
-  if (!registro_aberto()) novidades142_desenhar(agora);
-  CAMADA_SE(novidades148_aberto());
-  if (!registro_aberto()) novidades148_desenhar(agora);
-  CAMADA_SE(novidades170_aberto());
-  if (!registro_aberto()) novidades170_desenhar(agora);
-  CAMADA_SE(novidades180_aberto());
-  if (!registro_aberto()) novidades180_desenhar(agora);
-  // O esmaecer de saida do guia da 2.0, por cima do app que ja voltou.
-  if (!registro_aberto() && novidades20_visivel()) novidades20_desenhar(agora);
-  if (!registro_aberto()) novidades201_desenhar(agora);   // so o esmaecer de saida
-  if (!registro_aberto()) novidades202_desenhar(agora);
-  if (!registro_aberto()) novcartao_desenhar(agora);      // so o esmaecer de saida
+
   CAMADA_SE(telemetria_aberto());
   if (!registro_aberto()) telemetria_desenhar(agora);
   CAMADA_SE(recintro_aberto());
@@ -7416,9 +6712,10 @@ void app_desenhar(Uint32 agora) {
   // no primeiro quadro em que ele pode ser visto (ver avisos.c).
   // (perfilsel_concluido NAO serve de guarda: "Voltar: continuar como X" sai
   // da escolha com `sair`, nunca com `concluido`, e a central ficaria muda.)
-  if (!registro_aberto() && !player_aberto() && sessao_logada() &&
+  // avisos_desenhar desativado completamente conforme solicitacao do usuario
+  /* if (!registro_aberto() && !player_aberto() && sessao_logada() &&
       tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL)
-    avisos_desenhar(agora);
+    avisos_desenhar(agora); */
   // A ILHA DO RELOGIO (ilha.h): mesmas guardas da central — com a pessoa
   // dentro do app. Com o player aberto quem fala e a ilha DO PLAYER
   // (plrilha.h, desenhada em desenharTelas): a mesma pilula, no mesmo canto,
@@ -7475,9 +6772,6 @@ void app_desenhar(Uint32 agora) {
     // O CARTAO DA ATUALIZACAO e a pilula crescida (atualizacao.c): enquanto
     // ele esta na tela, ela fica por baixo, medindo, sem se desenhar.
     ilha_coberta(spainel_da_ilha() || atualizacao_cobre_ilha());
-#ifdef NV_TOUCH_UI
-    if (layout_modo_mobile()) CAMADA_SE(central_aberta() || ilha_modal_aberto());
-#endif
     ilha_desenhar(agora);
   }
   // O cartao do lembrete fica acima do player e da tela: e um aviso com hora.
@@ -7494,15 +6788,9 @@ void app_desenhar(Uint32 agora) {
   CAMADA_SE(pipintro_aberto());
   if (!registro_aberto()) pipintro_desenhar(agora);
   if (!registro_aberto()) {
-#ifdef NV_TOUCH_UI
-    if (layout_modo_mobile()) CAMADA_SE(spot_aberto());
-#endif
     spot_desenhar(agora, spotVeuPronto);
   }
   if (!registro_aberto()) {
-#ifdef NV_TOUCH_UI
-    if (layout_modo_mobile()) CAMADA_SE(celb_aberto());
-#endif
     celb_desenhar();
   }
   CAMADA_SE(diagnostico_intro_aberto());
@@ -7515,9 +6803,6 @@ void app_desenhar(Uint32 agora) {
   if (registro_aberto() && sessao_logada()) {
     ilha_relogio_visivel(ajustes_relogio_ligado());
     ilha_posicionar(1);
-#ifdef NV_TOUCH_UI
-    if (layout_modo_mobile()) CAMADA_SE(central_aberta() || ilha_modal_aberto());
-#endif
     ilha_desenhar(agora);
   }
   // AS DICAS DO CONTROLE por ultimo, por cima de tudo: a dica abre o
@@ -7540,8 +6825,7 @@ int app_central_pode(void) {
   if (central_aberta()) return 1;   // o CH+ que fecha passa pelo mesmo caminho
   return tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL && login_concluido() &&
          perfilsel_concluido() && !registro_aberto() && !spot_aberto() &&
-         !teclado_aberto() && !diagnostico_intro_aberto() && !novidades20_aberto() &&
-         !novidades201_aberto() && !novidades202_aberto() && !novcartao_aberto() && !dicascontrole_ocupado();
+         !teclado_aberto() && !diagnostico_intro_aberto() && !dicascontrole_ocupado();
 }
 
 void app_encerrar(void) {
@@ -7576,7 +6860,6 @@ void app_encerrar(void) {
   diagnostico_encerrar();
   livetvdiag_encerrar();
   biblioteca_encerrar();
-  explorar_encerrar();
   perfil_encerrar();
   busca_encerrar();
   home_encerrar();

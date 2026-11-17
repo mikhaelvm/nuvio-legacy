@@ -81,7 +81,6 @@ int  detail_pediu_fontes(void);       // OK segurado, ou o botao "..."
 // A folha rouba o foco da fileira: ler detail_ep_foco depois apontava o
 // episodio em andamento, nao o escolhido (#513). 0 = folha do titulo.
 int  detail_pediu_fontes_ep(int *temporada, int *episodio);
-int  detail_pediu_explorar(void);     // circular "Explorar": abrir a toca (explorar.h) neste titulo, uma vez
 // Botao secundario "Reproduzir desde o inicio", que so existe quando ha
 // progresso. Hoje ele tambem marca `detail_pediu_reproduzir`, porque o roteador
 // ainda nao sabe abrir o player ignorando o ponto salvo.

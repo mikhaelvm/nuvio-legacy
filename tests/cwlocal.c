@@ -13,6 +13,8 @@ static int falhaMeta = 0, enriquecidos;
 static int cwlocal_enfeitar_lote(CatItem *v, int n) {
   int w = 0;
   for (int i = 0; i < n; i++) {
+    if (cwo_conta_a_seguir(v[i].imdb) && !v[i].poster[0])
+      snprintf(v[i].poster, sizeof v[i].poster, "https://fixture.invalid/next.jpg");
     if (falhaMeta || !v[i].poster[0]) continue;
     if (idbase_e_imdb(v[i].imdb)) {
       snprintf(v[i].sinopse, sizeof v[i].sinopse, "Metadados novos");
@@ -91,6 +93,25 @@ int main(void) {
   fonteTeste = AJ_CWF_TRAKT; traktAtivoTeste = 0; traktFalhouTeste = 1;
   n = montarContinuar(lote, 12);
   assert(n == 5 && porId(lote, n, "tt101:1:3")->progresso == 40);
+  prog_esquecer_tudo();
+  assert(prog_gravar_local("ttNext1", 1, 3, 290, 300, -1));
+  assert(prog_gravar_local("ttNext2", 2, 4, 290, 300, -1));
+  assert(prog_gravar_local("ttNext3", 3, 5, 290, 300, -1));
+  ContaSemente seeds[PROX_MAX_BUSCAS];
+  memset(seeds, 0, sizeof seeds);
+  int ns = contaSementesProgresso(seeds, -1);
+  assert(ns == 3);
+  for (int q = 0; q < ns; q++) assert(seeds[q].episodio == seeds[q].temporada + 3);
+  assert(contaSementesProgresso(seeds, ns) == 3); // no duplicate on refresh
+  prog_esquecer_tudo();
+  // Actual TV case: the legacy hidden switch is off. Account Next Up must
+  // still include completed shows, alongside the remaining paused show.
+  fonteTeste = AJ_CWF_CONTA; proximoTeste = 0; contaSementesTeste = 1;
+  contaBaseMs = (long long)time(NULL) * 1000LL;
+  falhaMeta = 0;
+  n = montarContinuar(lote, 12);
+  assert(n > 0); // account seeds survive the obsolete switch
+  proximoTeste = 1; contaSementesTeste = 0;
   prog_esquecer_tudo();
   puts("cwlocal: IMDb/TMDB/Kitsu/provider cache, offline/uncached progress, base+type identity and original thresholds ok");
 }

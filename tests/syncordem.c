@@ -260,6 +260,7 @@ void addons_diferenca(const AddonRemoto *a, int na, const AddonRemoto *d, int nd
 void agenda_esquecer(void) {}
 void lembrete_esquecer_todos(void) {}
 int  ajustes_aplicar_blob(const char *j) { (void)j; blobsAplicados++; return 0; }
+void selospacote_conta_do_blob(const char *b) { (void)b; }
 void ajustes_idiomas_da_conta(const char *b) {
   idiomasChamadas++;
   snprintf(idiomasConta, sizeof idiomasConta, "%s", b ? b : "");

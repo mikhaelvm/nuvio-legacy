@@ -1,7 +1,6 @@
 #!/bin/bash
 # tools/ctr.sh must keep the caller's requested platform (SDK selection is separate),
 # default to docker off macOS (Linux CI) and pass docker flags through untouched.
-# Also tools/tizen-tpk-spike.sh must find tools/ctr.sh.
 cd "$(dirname "$0")/.."
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 for c in container docker; do printf '#!/bin/sh\necho "%s $*" >> "%s/log"\n' "$c" "$T" > "$T/$c"; done
@@ -18,6 +17,4 @@ caso "helper preserves explicit platform" "container run --rm --platform linux/a
 caso "docker passthrough" "docker run --rm --platform linux/arm/v5 --user 1:1 -v /a:/b:ro img true" NUVIO_CTR=docker
 caso "linux defaults to docker" "docker run --rm --platform linux/arm/v5 --user 1:1 -v /a:/b:ro img true" FAKE_UNAME=Linux
 
-saida="$(TIZEN_SDK="$T/nada" bash tools/tizen-tpk-spike.sh 2>&1)"
-if grep -q 'Falta NativeToolchain' <<<"$saida"; then echo "OK   spike sources ctr.sh"; else echo "FAIL spike: $saida"; falha=1; fi
 exit $falha

@@ -29,6 +29,6 @@ Profiles stay apart, the home opens in your order, one source per play, and your
 - Samsung: the package is unsigned on purpose; sign it with your own certificate as before.
 
 ## Packages
-- `space.nuvio.native.legacy_1.4.4_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.4.4_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.4.4_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.4.4_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.4.4-tizen.wgt` — Samsung Tizen (WASM), unsigned; sign it with your own certificate as before.

@@ -48,6 +48,6 @@ OK on a trailer card (or on the trailer button) plays it full screen, with sound
 - The What's new card is shown once.
 
 ## Packages
-- `space.nuvio.native.legacy_1.3.9_arm.ipk` — LG webOS (arm). Default texture budget.
-- `space.nuvio.native.legacy_1.3.9_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
+- `com.mikhael.nuvio_1.3.9_arm.ipk` — LG webOS (arm). Default texture budget.
+- `com.mikhael.nuvio_1.3.9_arm-highcache.ipk` — LG webOS (arm), 300 MB texture cache for TVs with ≥2 GB RAM.
 - `NuvioTV-1.3.9-tizen.wgt` — Samsung Tizen (WASM).
